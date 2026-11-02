@@ -8,6 +8,7 @@ export interface PanelState {
     file: string | null;
     cards: Card[];
     draft: { from: number; anchor: string } | null;
+    hideResolved: boolean;
 }
 
 export type PanelMessage =
@@ -16,6 +17,8 @@ export type PanelMessage =
     | { type: 'reply'; id: string; body: string }
     | { type: 'edit'; id: string; position: number; body: string }
     | { type: 'delete'; id: string }
+    | { type: 'deleteComment'; id: string; position: number }
+    | { type: 'setHideResolved'; hide: boolean }
     | { type: 'accept'; id: string }
     | { type: 'reject'; id: string }
     | { type: 'resolve'; id: string; resolved: boolean }
@@ -26,7 +29,7 @@ export type PanelMessage =
 export class ReviewPanel implements vscode.WebviewViewProvider {
     private view: vscode.WebviewView | undefined;
     private ready = false;
-    private state: PanelState = { file: null, cards: [], draft: null };
+    private state: PanelState = { file: null, cards: [], draft: null, hideResolved: false };
     private pendingFocus: string | null = null;
 
     constructor(private readonly extensionUri: vscode.Uri, private readonly onMessage: (message: PanelMessage) => void) {}
@@ -71,6 +74,13 @@ export class ReviewPanel implements vscode.WebviewViewProvider {
         this.post();
     }
 
+    // Runs a title-bar action that only changes what the panel shows.
+    command(name: 'expandAll' | 'collapseAll'): void {
+        if (this.ready) {
+            this.view?.webview.postMessage({ type: 'command', name });
+        }
+    }
+
     // Opens the panel and puts the keyboard focus into the reply box of a card, or of the draft when id is null.
     async focus(id: string | null): Promise<void> {
         this.pendingFocus = id ?? '';
@@ -96,6 +106,9 @@ export class ReviewPanel implements vscode.WebviewViewProvider {
         if (!this.view || !this.ready) {
             return;
         }
+        const resolved = this.state.cards.filter(c => c.resolved).length;
+        const open = this.state.cards.length - resolved;
+        this.view.description = this.state.file ? `${open} open · ${resolved} resolved` : undefined;
         this.view.webview.postMessage({ type: 'render', state: this.state });
         if (this.pendingFocus !== null) {
             this.view.webview.postMessage({ type: 'focus', id: this.pendingFocus || null });

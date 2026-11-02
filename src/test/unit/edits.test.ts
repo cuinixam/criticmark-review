@@ -1,7 +1,8 @@
 import * as assert from 'assert';
 import { parse } from '../../markup/parse';
 import {
-    TextEdit, addComment, checkSelection, commentMarkup, commentOnNode, deleteThread, editComment, isCurrent, reply, resolveSuggestion,
+    TextEdit, addComment, checkSelection, commentMarkup, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply,
+    resolveSuggestion,
     setResolved, validateBody,
 } from '../../markup/edits';
 
@@ -117,6 +118,20 @@ suite('edits', () => {
         assert.strictEqual(apply(text, editComment(parsed, 2, 'again')), 'a {==x==}{author="Max" date="2026-11-01">>old<<}{>>Claude: again<<} b');
         assert.throws(() => editComment(parsed, 1, 'a <<} b'));
     });
+
+    const deleteCases: [string, number, string][] = [
+        ['a {==x==}{>>c<<}{>>r<<} b', 2, 'a {==x==}{>>c<<} b'],
+        ['a {==x==}{>>c<<}{>>r<<} b', 1, 'a {==x==}{>>r<<} b'],
+        ['a {==x==}{author="M" status="resolved">>c<<} {>>r<<} b', 1, 'a {==x==}{status="resolved">>r<<} b'],
+        ['a {==x==}{>>c<<} b', 1, 'a x b'],
+        ['a {++x++}{>>c<<} b', 1, 'a {++x++} b'],
+    ];
+    for (const [text, nodeIndex, expected] of deleteCases) {
+        test(`deleteComment ${nodeIndex} in ${text}`, () => {
+            const parsed = parse(text);
+            assert.strictEqual(apply(text, deleteComment(parsed, parsed.threads[0], nodeIndex)), expected);
+        });
+    }
 
     const resolveCases: [string, boolean, string][] = [
         ['{==x==}{author="Max" date="2026-11-01">>c<<}{>>r<<}', true, '{==x==}{author="Max" date="2026-11-01" status="resolved">>c<<}{>>r<<}'],

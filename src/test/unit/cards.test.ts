@@ -18,6 +18,10 @@ suite('cards', () => {
         assert.strictEqual(result[1].suggestion, 4);
         assert.deepStrictEqual(result[1].comments, []);
         assert.strictEqual(result[4].comments[0].author, 'Claude');
+        assert.deepStrictEqual(result.slice(1, 4).map(c => c.change), [
+            { old: null, new: 'really ' }, { old: 'never ', new: null }, { old: 'tabs', new: 'spaces' },
+        ]);
+        assert.strictEqual(result[0].change, null);
     });
 
     test('a thread on a suggestion is one card', () => {

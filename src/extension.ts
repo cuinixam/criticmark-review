@@ -2,7 +2,7 @@ import * as os from 'os';
 import * as vscode from 'vscode';
 import { Card, cards, short } from './markup/cards';
 import {
-    TextEdit, addComment, checkSelection, commentOnNode, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
+    TextEdit, addComment, checkSelection, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
 } from './markup/edits';
 import { parse } from './markup/parse';
 import { Decorations } from './ui/Decorations';
@@ -47,6 +47,8 @@ export function activate(context: vscode.ExtensionContext): void {
     let selected: string | undefined;
     // Set while an edit runs, so a double click cannot write the same reply twice.
     let busy = false;
+    let hideResolved = context.globalState.get('hideResolved', false);
+    vscode.commands.executeCommand('setContext', 'criticmarkReview.hideResolved', hideResolved);
 
     const decorate = (document: vscode.TextDocument) => {
         const parsed = parse(document.getText());
@@ -104,6 +106,7 @@ export function activate(context: vscode.ExtensionContext): void {
             file: current ? current.uri.toString() : null,
             cards: shown,
             draft: showDraft ? { from: draft!.from, anchor: short(draft!.selected) } : null,
+            hideResolved,
         });
         updateCursorContext();
     };
@@ -194,6 +197,10 @@ export function activate(context: vscode.ExtensionContext): void {
             }
             return false;
         }
+        if (message.type === 'setHideResolved') {
+            setHideResolved(message.hide);
+            return false;
+        }
         if (message.type === 'cancelDraft') {
             draft = undefined;
             render();
@@ -214,9 +221,11 @@ export function activate(context: vscode.ExtensionContext): void {
             render();
             return ok;
         }
-        if (message.type === 'delete') {
-            const answer = await vscode.window.showWarningMessage(
-                'Delete this thread?', { modal: true, detail: 'All its comments are removed from the file.' }, 'Delete');
+        if (message.type === 'delete' || message.type === 'deleteComment') {
+            const answer = message.type === 'delete'
+                ? await vscode.window.showWarningMessage(
+                    'Delete this thread?', { modal: true, detail: 'All its comments are removed from the file.' }, 'Delete')
+                : await vscode.window.showWarningMessage('Delete this comment?', { modal: true }, 'Delete');
             if (answer !== 'Delete') {
                 return false;
             }
@@ -238,6 +247,13 @@ export function activate(context: vscode.ExtensionContext): void {
                 const comment = card.comments[message.position];
                 if (comment) {
                     ok = await applyEdit(document, () => editComment(parsed, comment.nodeIndex, message.body));
+                }
+                break;
+            }
+            case 'deleteComment': {
+                const comment = card.comments[message.position];
+                if (thread && comment) {
+                    ok = await applyEdit(document, () => deleteComment(parsed, thread, comment.nodeIndex));
                 }
                 break;
             }
@@ -268,6 +284,13 @@ export function activate(context: vscode.ExtensionContext): void {
             panel.result(ok);
         }
     });
+
+    const setHideResolved = (hide: boolean) => {
+        hideResolved = hide;
+        void context.globalState.update('hideResolved', hide);
+        vscode.commands.executeCommand('setContext', 'criticmarkReview.hideResolved', hide);
+        render();
+    };
 
     const atCursor = (type: 'delete' | 'accept' | 'reject') => () => {
         const card = cardAtCursor();
@@ -337,6 +360,10 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         })),
         vscode.commands.registerCommand('criticmarkReview.deleteThread', atCursor('delete')),
+        vscode.commands.registerCommand('criticmarkReview.expandAll', () => panel.command('expandAll')),
+        vscode.commands.registerCommand('criticmarkReview.collapseAll', () => panel.command('collapseAll')),
+        vscode.commands.registerCommand('criticmarkReview.hideResolved', () => setHideResolved(true)),
+        vscode.commands.registerCommand('criticmarkReview.showResolved', () => setHideResolved(false)),
         vscode.commands.registerCommand('criticmarkReview.accept', atCursor('accept')),
         vscode.commands.registerCommand('criticmarkReview.reject', atCursor('reject')),
     );

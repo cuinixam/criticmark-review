@@ -1,4 +1,4 @@
-import { Parsed, Thread, codeRanges } from './parse';
+import { MarkupNode, Parsed, Thread, codeRanges } from './parse';
 
 // `expected` is the text the edit replaces; callers refuse the edit when the document no longer has it.
 export interface TextEdit {
@@ -84,15 +84,40 @@ export function editComment(parsed: Parsed, nodeIndex: number, body: string): Te
     return { from: node.from, to: node.to, insert: `{${node.meta}>>${prefix}${body}<<}`, expected: node.raw };
 }
 
-// The state lives on the first comment, which replies never move.
-export function setResolved(parsed: Parsed, thread: Thread, resolved: boolean): TextEdit {
-    const root = parsed.nodes[thread.rootIndex];
-    let meta = root.meta.replace(/(^|[ \t]+)status="[^"]*"/gi, '').trim();
+function withStatus(node: MarkupNode, resolved: boolean): string {
+    let meta = node.meta.replace(/(^|[ \t]+)status="[^"]*"/gi, '').trim();
     if (resolved) {
         meta = meta ? `${meta} status="resolved"` : 'status="resolved"';
     }
-    const insert = `{${meta}${root.raw.slice(root.meta.length + 1)}`;
-    return { from: root.from, to: root.to, insert, expected: root.raw };
+    return `{${meta}${node.raw.slice(node.meta.length + 1)}`;
+}
+
+// The state lives on the first comment, which replies never move.
+export function setResolved(parsed: Parsed, thread: Thread, resolved: boolean): TextEdit {
+    const root = parsed.nodes[thread.rootIndex];
+    return { from: root.from, to: root.to, insert: withStatus(root, resolved), expected: root.raw };
+}
+
+// Deleting the last comment deletes the thread. Deleting the first one moves the resolved state to the next.
+export function deleteComment(parsed: Parsed, thread: Thread, nodeIndex: number): TextEdit {
+    const ids = [thread.rootIndex, ...thread.replyIndexes];
+    const position = ids.indexOf(nodeIndex);
+    if (position < 0) {
+        throw new Error('The comment is not in this thread.');
+    }
+    if (ids.length === 1) {
+        return deleteThread(parsed, thread);
+    }
+    const node = parsed.nodes[nodeIndex];
+    let from: number, to: number, insert: string;
+    if (position === 0) {
+        const next = parsed.nodes[ids[1]];
+        [from, to] = [node.from, next.to];
+        insert = node.status === 'resolved' ? withStatus(next, true) : next.raw;
+    } else {
+        [from, to, insert] = [parsed.nodes[ids[position - 1]].to, node.to, ''];
+    }
+    return { from, to, insert, expected: parsed.text.slice(from, to) };
 }
 
 export function deleteThread(parsed: Parsed, thread: Thread): TextEdit {

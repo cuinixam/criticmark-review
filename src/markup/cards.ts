@@ -20,6 +20,8 @@ export interface Card {
     thread: number | null;
     suggestion: number | null;
     resolved: boolean;
+    // The text a suggestion removes and adds, null for the side it does not have; null when the card is not a suggestion.
+    change: { old: string | null; new: string | null } | null;
     comments: CardComment[];
 }
 
@@ -28,6 +30,14 @@ const SUGGESTIONS = new Set(['addition', 'deletion', 'substitution']);
 export function short(text: string): string {
     const line = text.replace(/\s+/g, ' ').trim();
     return line.length > 40 ? line.slice(0, 39) + '…' : line;
+}
+
+function change(node: MarkupNode): Card['change'] {
+    switch (node.kind) {
+        case 'addition': return { old: null, new: node.text };
+        case 'deletion': return { old: node.text, new: null };
+        default: return { old: node.oldText!, new: node.text };
+    }
 }
 
 function suggestionLabel(node: MarkupNode): string {
@@ -55,6 +65,7 @@ export function cards(parsed: Parsed): Card[] {
             thread: index,
             suggestion: isSuggestion ? thread.anchorIndex : null,
             resolved: parsed.nodes[thread.rootIndex].status === 'resolved',
+            change: isSuggestion ? change(anchor) : null,
             comments: [thread.rootIndex, ...thread.replyIndexes].map(i => {
                 const node = parsed.nodes[i];
                 return { nodeIndex: i, author: node.author, date: node.date, text: node.text };
@@ -65,7 +76,8 @@ export function cards(parsed: Parsed): Card[] {
         if (SUGGESTIONS.has(node.kind) && !anchored.has(nodeIndex)) {
             result.push({
                 key: node.raw,
-                from: node.from, to: node.to, anchor: suggestionLabel(node), thread: null, suggestion: nodeIndex, resolved: false, comments: [],
+                from: node.from, to: node.to, anchor: suggestionLabel(node), thread: null, suggestion: nodeIndex, resolved: false, change: change(node),
+                comments: [],
             });
         }
     });

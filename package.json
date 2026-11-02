@@ -81,7 +81,7 @@
       },
       {
         "command": "criticmarkReview.deleteThread",
-        "title": "Delete Comment",
+        "title": "Delete Thread",
         "category": "CriticMark"
       },
       {
@@ -92,6 +92,30 @@
       {
         "command": "criticmarkReview.reject",
         "title": "Reject Suggestion",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.hideResolved",
+        "title": "Hide Resolved Threads",
+        "icon": "$(filter)",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.showResolved",
+        "title": "Show Resolved Threads",
+        "icon": "$(filter-filled)",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.expandAll",
+        "title": "Expand All",
+        "icon": "$(expand-all)",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)",
         "category": "CriticMark"
       }
     ],
@@ -148,6 +172,44 @@
         {
           "command": "criticmarkReview.reject",
           "when": "false"
+        },
+        {
+          "command": "criticmarkReview.hideResolved",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.showResolved",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.collapseAll",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "criticmarkReview.hideResolved",
+          "when": "view == criticmarkReview.threads && !criticmarkReview.hideResolved",
+          "group": "navigation@1"
+        },
+        {
+          "command": "criticmarkReview.showResolved",
+          "when": "view == criticmarkReview.threads && criticmarkReview.hideResolved",
+          "group": "navigation@2"
+        },
+        {
+          "command": "criticmarkReview.expandAll",
+          "when": "view == criticmarkReview.threads",
+          "group": "navigation@3"
+        },
+        {
+          "command": "criticmarkReview.collapseAll",
+          "when": "view == criticmarkReview.threads",
+          "group": "navigation@4"
         }
       ]
     }
