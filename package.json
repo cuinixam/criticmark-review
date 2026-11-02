@@ -1,0 +1,148 @@
+{
+  "name": "criticmark-review",
+  "displayName": "CriticMark Review",
+  "publisher": "cuinixam",
+  "description": "Review CriticMarkup comments and suggestions in markdown files from the Comments panel, compatible with the Obsidian Track Changes plugin.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "keywords": [
+    "criticmarkup",
+    "review",
+    "comments",
+    "markdown",
+    "track changes"
+  ],
+  "engines": {
+    "vscode": "^1.116.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "CriticMark Review",
+      "properties": {
+        "criticmarkReview.author": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Name written into `author=\"…\"` of new comments and replies. When empty, only the date is written."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "criticmarkReview.addComment",
+        "title": "Add Comment",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.reply",
+        "title": "Reply",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.deleteThread",
+        "title": "Delete Thread",
+        "icon": "$(trash)",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.accept",
+        "title": "Accept Suggestion",
+        "icon": "$(check)",
+        "category": "CriticMark"
+      },
+      {
+        "command": "criticmarkReview.reject",
+        "title": "Reject Suggestion",
+        "icon": "$(close)",
+        "category": "CriticMark"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "criticmarkReview.addComment",
+          "when": "editorLangId == markdown",
+          "group": "criticmark@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "criticmarkReview.reply",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.deleteThread",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.accept",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.reject",
+          "when": "false"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "criticmarkReview.reply",
+          "when": "commentController == criticmarkReview",
+          "group": "inline"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "criticmarkReview.accept",
+          "when": "commentController == criticmarkReview && commentThread =~ /^suggestion/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "criticmarkReview.reject",
+          "when": "commentController == criticmarkReview && commentThread =~ /^suggestion/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "criticmarkReview.deleteThread",
+          "when": "commentController == criticmarkReview && commentThread != suggestion",
+          "group": "navigation@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "mocha",
+    "test:integration": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.116.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
+    "mocha": "^11.7.5",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

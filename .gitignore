@@ -1,0 +1,8 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+
+# Compiled output never belongs in src/ , bundling happens via esbuild into dist/
+src/**/*.js
