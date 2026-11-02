@@ -18,15 +18,25 @@ The extension saves the file after each change, so an agent reading the file on 
 
 ## Install
 
-The extension is not on the Marketplace. Build the package and install it:
+The extension is not on the Marketplace. Download the `.vsix` file from the latest [GitHub release](https://github.com/cuinixam/criticmark-review/releases) and install it:
+
+```bash
+code --install-extension criticmark-review-<version>.vsix
+```
+
+To build it yourself instead (you need Node.js):
 
 ```bash
 npm install
-npx vsce package --allow-missing-repository --no-rewrite-relative-links
-code --install-extension criticmark-review-0.1.0.vsix
+npx vsce package
+code --install-extension criticmark-review-<version>.vsix
 ```
 
-You need Node.js and VS Code. The steps are the same on macOS, Ubuntu and Windows.
+The steps are the same on macOS, Ubuntu and Windows.
+
+## Releases
+
+Every push to `main` runs the tests and then [semantic-release](https://semantic-release.gitbook.io/). It picks the next version from the commit messages (`fix:` and `feat:`), updates `CHANGELOG.md` and `package.json`, and attaches the `.vsix` to a GitHub release. Never change the version by hand.
 
 ## Settings
 

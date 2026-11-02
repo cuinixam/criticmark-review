@@ -15,3 +15,5 @@ package-lock.json
 **/.DS_Store
 .mocharc.json
 AGENTS.md
+.github/**
+.releaserc.json
