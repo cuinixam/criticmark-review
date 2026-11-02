@@ -67,6 +67,23 @@ svg {
     background: var(--hover);
 }
 
+.head {
+    position: relative;
+}
+
+.head .more {
+    visibility: hidden;
+}
+
+.head:hover .more, .head .more.shown {
+    visibility: visible;
+}
+
+.head .menu {
+    top: 30px;
+    right: 6px;
+}
+
 .chevron {
     width: 20px;
     height: 20px;

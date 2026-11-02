@@ -8,7 +8,7 @@
     let state = { file: null, cards: [], draft: null, hideResolved: false };
     // Comment being edited: { id, position }.
     let editing = null;
-    // Comment whose "…" menu is open: { id, position }.
+    // Comment whose "…" menu is open: { id, position }, with position -1 for the card's own menu.
     let menu = null;
     // Text typed in every box, by file and box, so it survives re-renders and switching files.
     const typed = new Map();
@@ -242,6 +242,21 @@
             vscode.postMessage({ type: 'reveal', id: card.id });
         });
         if (card.thread !== null) {
+            const menuOpen = menu && menu.id === card.id && menu.position === -1;
+            head.append(iconButton('more', 'more' + (menuOpen ? ' shown' : ''), () => {
+                menu = menuOpen ? null : { id: card.id, position: -1 };
+                draw();
+            }, 'More actions'));
+            if (menuOpen) {
+                const list = el('div', 'menu');
+                list.addEventListener('click', event => event.stopPropagation());
+                list.append(button('Delete thread', 'danger', () => {
+                    menu = null;
+                    draw();
+                    vscode.postMessage({ type: 'delete', id: card.id });
+                }));
+                head.append(list);
+            }
             head.append(iconButton(card.resolved ? 'circleCheckFilled' : 'circleCheck', 'resolve' + (card.resolved ? ' done' : ''),
                 () => vscode.postMessage({ type: 'resolve', id: card.id, resolved: !card.resolved }),
                 card.resolved ? 'Reopen thread' : 'Resolve thread'));
