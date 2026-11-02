@@ -43,8 +43,18 @@
     },
     "colors": [
       {
+        "id": "criticmarkReview.highlightBackground",
+        "description": "Background of highlighted text that a comment refers to.",
+        "defaults": {
+          "dark": "#ffd0004d",
+          "light": "#ffe34d80",
+          "highContrast": "#ffd00066",
+          "highContrastLight": "#ffe34d80"
+        }
+      },
+      {
         "id": "criticmarkReview.resolvedBackground",
-        "description": "Background of resolved threads in the editor and the review panel.",
+        "description": "Background of resolved threads in the review panel.",
         "defaults": {
           "dark": "#2ea04333",
           "light": "#2ea04326",

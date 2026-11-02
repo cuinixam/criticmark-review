@@ -13,10 +13,13 @@ export class Decorations implements vscode.Disposable {
         textDecoration: 'line-through',
     });
     private readonly highlight = vscode.window.createTextEditorDecorationType({
-        backgroundColor: new vscode.ThemeColor('editor.findMatchHighlightBackground'),
+        backgroundColor: new vscode.ThemeColor('criticmarkReview.highlightBackground'),
     });
+    // An underline, not a background: a green background already means added text.
     private readonly resolved = vscode.window.createTextEditorDecorationType({
-        backgroundColor: new vscode.ThemeColor('criticmarkReview.resolvedBackground'),
+        borderStyle: 'none none solid none',
+        borderWidth: '0 0 2px 0',
+        borderColor: new vscode.ThemeColor('gitDecoration.addedResourceForeground'),
     });
     private readonly aitext = vscode.window.createTextEditorDecorationType({
         textDecoration: 'underline dotted',
