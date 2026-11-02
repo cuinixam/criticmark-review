@@ -9,8 +9,11 @@ export interface MarkupNode {
     raw: string;
     text: string;
     oldText?: string;
+    // The attribute text between `{` and the opening marker, kept so an edit can rewrite the element without losing attributes.
+    meta: string;
     author: string | null;
     date: string | null;
+    status: string | null;
 }
 
 export interface Thread {
@@ -123,8 +126,10 @@ function toNode(kind: Kind, m: RegExpMatchArray): MarkupNode {
         to: from + m[0].length,
         raw: m[0],
         text: m[2],
+        meta: m[1],
         author: attrs.author ?? null,
         date: attrs.date ?? null,
+        status: attrs.status ?? null,
     };
     if (kind === 'substitution') {
         node.oldText = m[2];

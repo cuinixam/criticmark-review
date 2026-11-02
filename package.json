@@ -2,7 +2,7 @@
   "name": "criticmark-review",
   "displayName": "CriticMark Review",
   "publisher": "cuinixam",
-  "description": "Review CriticMarkup comments and suggestions in markdown files from the Comments panel, compatible with the Obsidian Track Changes plugin.",
+  "description": "Review CriticMarkup comments and suggestions in markdown files from a side panel, compatible with the Obsidian Track Changes plugin.",
   "version": "0.1.0",
   "license": "MIT",
   "keywords": [
@@ -29,9 +29,39 @@
         "criticmarkReview.author": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Name written into `author=\"…\"` of new comments and replies. When empty, only the date is written."
+          "markdownDescription": "Name written into `author=\"…\"` of new comments and replies. When empty, your system user name is used, or `User` if there is none."
         }
       }
+    },
+    "colors": [
+      {
+        "id": "criticmarkReview.resolvedBackground",
+        "description": "Background of resolved threads in the editor and the review panel.",
+        "defaults": {
+          "dark": "#2ea04333",
+          "light": "#2ea04326",
+          "highContrast": "#2ea04340",
+          "highContrastLight": "#2ea04326"
+        }
+      }
+    ],
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "criticmarkReview",
+          "title": "Review",
+          "icon": "media/review.svg"
+        }
+      ]
+    },
+    "views": {
+      "criticmarkReview": [
+        {
+          "type": "webview",
+          "id": "criticmarkReview.threads",
+          "name": "Threads"
+        }
+      ]
     },
     "commands": [
       {
@@ -40,26 +70,28 @@
         "category": "CriticMark"
       },
       {
-        "command": "criticmarkReview.reply",
+        "command": "criticmarkReview.openReply",
         "title": "Reply",
         "category": "CriticMark"
       },
       {
+        "command": "criticmarkReview.commentSuggestion",
+        "title": "Comment on Suggestion",
+        "category": "CriticMark"
+      },
+      {
         "command": "criticmarkReview.deleteThread",
-        "title": "Delete Thread",
-        "icon": "$(trash)",
+        "title": "Delete Comment",
         "category": "CriticMark"
       },
       {
         "command": "criticmarkReview.accept",
         "title": "Accept Suggestion",
-        "icon": "$(check)",
         "category": "CriticMark"
       },
       {
         "command": "criticmarkReview.reject",
         "title": "Reject Suggestion",
-        "icon": "$(close)",
         "category": "CriticMark"
       }
     ],
@@ -67,13 +99,42 @@
       "editor/context": [
         {
           "command": "criticmarkReview.addComment",
-          "when": "editorLangId == markdown",
+          "when": "editorLangId == markdown && !criticmarkReview.at",
           "group": "criticmark@1"
+        },
+        {
+          "command": "criticmarkReview.openReply",
+          "when": "editorLangId == markdown && criticmarkReview.at == thread",
+          "group": "criticmark@1"
+        },
+        {
+          "command": "criticmarkReview.deleteThread",
+          "when": "editorLangId == markdown && criticmarkReview.at == thread",
+          "group": "criticmark@2"
+        },
+        {
+          "command": "criticmarkReview.commentSuggestion",
+          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "group": "criticmark@1"
+        },
+        {
+          "command": "criticmarkReview.accept",
+          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "group": "criticmark@2"
+        },
+        {
+          "command": "criticmarkReview.reject",
+          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "group": "criticmark@3"
         }
       ],
       "commandPalette": [
         {
-          "command": "criticmarkReview.reply",
+          "command": "criticmarkReview.openReply",
+          "when": "false"
+        },
+        {
+          "command": "criticmarkReview.commentSuggestion",
           "when": "false"
         },
         {
@@ -87,30 +148,6 @@
         {
           "command": "criticmarkReview.reject",
           "when": "false"
-        }
-      ],
-      "comments/commentThread/context": [
-        {
-          "command": "criticmarkReview.reply",
-          "when": "commentController == criticmarkReview",
-          "group": "inline"
-        }
-      ],
-      "comments/commentThread/title": [
-        {
-          "command": "criticmarkReview.accept",
-          "when": "commentController == criticmarkReview && commentThread =~ /^suggestion/",
-          "group": "navigation@1"
-        },
-        {
-          "command": "criticmarkReview.reject",
-          "when": "commentController == criticmarkReview && commentThread =~ /^suggestion/",
-          "group": "navigation@2"
-        },
-        {
-          "command": "criticmarkReview.deleteThread",
-          "when": "commentController == criticmarkReview && commentThread != suggestion",
-          "group": "navigation@3"
         }
       ]
     }

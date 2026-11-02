@@ -28,6 +28,7 @@ Any element may carry attributes right after the opening brace:
 - An attribute is `name="value"`. Several attributes are separated by spaces.
 - A value may not contain `"`, `{`, `}` or a line break.
 - `author` and `date` are the ones the extension shows. The date is `YYYY-MM-DD`.
+- `status="resolved"` on the first comment of a thread marks the thread as resolved. Other attributes are kept as they are.
 - A comment that starts with a short name and a colon (`{>>Claude: I agree.<<}`) uses that name as the author when there is no author attribute. The prefix is never shown as part of the text, so do not start a comment with a word and a colon (`Note: …`).
 
 ## Threads
@@ -41,6 +42,16 @@ A comment starts a thread. Comments that follow it with only spaces or tabs in b
 A line break between two comments starts a new thread.
 
 A comment directly after a highlight or a suggestion, with nothing in between, belongs to that highlight or suggestion.
+
+## Resolved threads
+
+A thread is resolved when its first comment has `status="resolved"`:
+
+```text
+{==the sentence==}{author="Max" date="2026-11-02" status="resolved">>Is this right?<<}{author="Claude" date="2026-11-02">>Yes.<<}
+```
+
+Only the person reviewing marks a thread as resolved or reopens it. Do not reply to a resolved thread, and do not add or remove `status="resolved"`. To list the open threads, skip every thread whose first comment has that attribute.
 
 ## How to reply
 

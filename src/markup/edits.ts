@@ -72,6 +72,29 @@ export function reply(parsed: Parsed, thread: Thread, body: string, author: stri
     return { from: last.from, to: last.to, insert: last.raw + commentMarkup(body, author, date), expected: last.raw };
 }
 
+export function editComment(parsed: Parsed, nodeIndex: number, body: string): TextEdit {
+    const error = validateBody(body);
+    if (error) {
+        throw new Error(error);
+    }
+    const node = parsed.nodes[nodeIndex];
+    const inner = node.raw.slice(node.meta.length + 3, -3);
+    // Keep a legacy `Name:` prefix, which is how that comment names its author.
+    const prefix = inner.slice(0, inner.length - node.text.length);
+    return { from: node.from, to: node.to, insert: `{${node.meta}>>${prefix}${body}<<}`, expected: node.raw };
+}
+
+// The state lives on the first comment, which replies never move.
+export function setResolved(parsed: Parsed, thread: Thread, resolved: boolean): TextEdit {
+    const root = parsed.nodes[thread.rootIndex];
+    let meta = root.meta.replace(/(^|[ \t]+)status="[^"]*"/gi, '').trim();
+    if (resolved) {
+        meta = meta ? `${meta} status="resolved"` : 'status="resolved"';
+    }
+    const insert = `{${meta}${root.raw.slice(root.meta.length + 1)}`;
+    return { from: root.from, to: root.to, insert, expected: root.raw };
+}
+
 export function deleteThread(parsed: Parsed, thread: Thread): TextEdit {
     const anchor = thread.anchorIndex === null ? null : parsed.nodes[thread.anchorIndex];
     const insert = anchor === null ? '' : anchor.kind === 'highlight' ? anchor.text : anchor.raw;

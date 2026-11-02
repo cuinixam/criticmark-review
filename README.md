@@ -1,12 +1,15 @@
 # CriticMark Review
 
-Review CriticMarkup comments and suggestions in markdown files from the VS Code Comments panel. You never edit the markup by hand: the extension writes it for you. Files stay compatible with the Track Changes plugin for Obsidian, and an AI agent can reply by editing the same file.
+Review CriticMarkup comments and suggestions in markdown files from a side panel in VS Code. You never edit the markup by hand: the extension writes it for you. Files stay compatible with the Track Changes plugin for Obsidian, and an AI agent can reply by editing the same file.
 
 ## What it does
 
-- Select text, right-click, **Add Comment**. Or click the `+` in the gutter.
-- Every thread shows in the gutter and in the **Comments** panel. Reply there, or delete a thread with the trash icon.
-- Suggestions (`{++…++}`, `{--…--}`, `{~~…~>…~~}`) are coloured in the editor and listed in the panel with **Accept** and **Reject**.
+- The **Review** panel in the right side bar lists every thread and suggestion of the active markdown file. If you do not see it, run **View: Open View…** and choose **Threads**.
+- Select text, right-click, **Add Comment**. A new card opens in the panel with the cursor in its text box. Press **Comment** or `Cmd+Enter` (`Ctrl+Enter` on Windows and Linux) to write it to the file, or **Cancel** or `Escape` to drop it.
+- Click a card to expand or collapse it and to jump to its text. Expanded, a card shows every comment, a reply box, **Edit** on each comment, and **Delete**. Suggestions also get **Accept** and **Reject**.
+- Tick the checkmark on a card to mark the thread as resolved. The card and its highlight turn green. Untick it to reopen the thread.
+- Right-click inside a comment for **Reply** and **Delete Comment**, or inside a suggestion for **Comment on Suggestion**, **Accept** and **Reject**.
+- Suggestions (`{++…++}`, `{--…--}`, `{~~…~>…~~}`) are coloured in the editor.
 - When the file changes on disk (for example an agent replied), the panel updates.
 
 The extension saves the file after each change, so an agent reading the file on disk sees your comments at once.
@@ -25,7 +28,7 @@ You need Node.js and VS Code. The steps are the same on macOS, Ubuntu and Window
 
 ## Settings
 
-- `criticmarkReview.author`: the name written into new comments and replies. When empty, only the date is written.
+- `criticmarkReview.author`: the name written into new comments and replies. When empty, your system user name is used, or `User` if there is none.
 
 ## For AI agents
 

@@ -15,6 +15,9 @@ export class Decorations implements vscode.Disposable {
     private readonly highlight = vscode.window.createTextEditorDecorationType({
         backgroundColor: new vscode.ThemeColor('editor.findMatchHighlightBackground'),
     });
+    private readonly resolved = vscode.window.createTextEditorDecorationType({
+        backgroundColor: new vscode.ThemeColor('criticmarkReview.resolvedBackground'),
+    });
     private readonly aitext = vscode.window.createTextEditorDecorationType({
         textDecoration: 'underline dotted',
     });
@@ -26,14 +29,27 @@ export class Decorations implements vscode.Disposable {
         const removed: vscode.Range[] = [];
         const highlight: vscode.Range[] = [];
         const aitext: vscode.DecorationOptions[] = [];
-        for (const node of parsed.nodes) {
+        const resolved: vscode.Range[] = [];
+        // A resolved thread turns its highlight green, or the comments themselves when nothing is highlighted.
+        const resolvedHighlights = new Set<number>();
+        for (const thread of parsed.threads) {
+            if (parsed.nodes[thread.rootIndex].status !== 'resolved') {
+                continue;
+            }
+            if (thread.anchorIndex === null) {
+                resolved.push(range(thread.from, thread.to));
+            } else if (parsed.nodes[thread.anchorIndex].kind === 'highlight') {
+                resolvedHighlights.add(thread.anchorIndex);
+            }
+        }
+        parsed.nodes.forEach((node, index) => {
             // Offsets are counted from the end, because an attribute value may contain marker characters.
             const innerTo = node.to - CLOSE;
             const innerFrom = innerTo - node.text.length;
             switch (node.kind) {
                 case 'addition': inserted.push(range(innerFrom, innerTo)); break;
                 case 'deletion': removed.push(range(innerFrom, innerTo)); break;
-                case 'highlight': highlight.push(range(innerFrom, innerTo)); break;
+                case 'highlight': (resolvedHighlights.has(index) ? resolved : highlight).push(range(innerFrom, innerTo)); break;
                 case 'aitext':
                     aitext.push({ range: range(innerFrom, innerTo), hoverMessage: node.author ?? 'AI text' });
                     break;
@@ -44,14 +60,15 @@ export class Decorations implements vscode.Disposable {
                     break;
                 }
             }
-        }
+        });
         editor.setDecorations(this.inserted, inserted);
         editor.setDecorations(this.removed, removed);
         editor.setDecorations(this.highlight, highlight);
         editor.setDecorations(this.aitext, aitext);
+        editor.setDecorations(this.resolved, resolved);
     }
 
     dispose(): void {
-        [this.inserted, this.removed, this.highlight, this.aitext].forEach(d => d.dispose());
+        [this.inserted, this.removed, this.highlight, this.aitext, this.resolved].forEach(d => d.dispose());
     }
 }

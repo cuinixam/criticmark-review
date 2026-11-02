@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 suite('Extension Integration Test Suite', () => {
-    test('shows threads for a markdown file', async () => {
+    test('activates on a markdown file and registers its commands', async () => {
         const file = path.join(__dirname, '../../../src/test/fixtures/sample.md');
         await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file));
 
@@ -15,7 +15,8 @@ suite('Extension Integration Test Suite', () => {
         const commands = await vscode.commands.getCommands(true);
         for (const id of [
             'criticmarkReview.addComment',
-            'criticmarkReview.reply',
+            'criticmarkReview.openReply',
+            'criticmarkReview.commentSuggestion',
             'criticmarkReview.deleteThread',
             'criticmarkReview.accept',
             'criticmarkReview.reject',

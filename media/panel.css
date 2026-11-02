@@ -1,0 +1,164 @@
+body {
+    padding: 4px 8px;
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+}
+
+.empty {
+    color: var(--vscode-descriptionForeground);
+}
+
+.card {
+    border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
+    border-left: 3px solid var(--vscode-editor-findMatchHighlightBorder, var(--vscode-focusBorder));
+    border-radius: 4px;
+    margin: 0 0 8px;
+    background: var(--vscode-sideBar-background);
+}
+
+.card.resolved {
+    border-left-color: var(--vscode-testing-iconPassed, #2ea043);
+    background: var(--vscode-criticmarkReview-resolvedBackground, rgba(46, 160, 67, 0.12));
+}
+
+.card.draft {
+    border-left-color: var(--vscode-focusBorder);
+}
+
+.head {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+
+.head input {
+    margin: 2px 0 0;
+}
+
+.twisty {
+    width: 10px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.title {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.anchor {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.anchor.suggestion {
+    font-style: italic;
+}
+
+.summary {
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card.open .summary {
+    white-space: normal;
+}
+
+.body {
+    padding: 0 8px 8px 24px;
+}
+
+.comment {
+    padding: 6px 0;
+    border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
+}
+
+.meta {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+}
+
+.meta .author {
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.meta button {
+    margin-left: auto;
+}
+
+.text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin-top: 2px;
+}
+
+.editor {
+    margin-top: 6px;
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, transparent);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 4px;
+}
+
+textarea:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.actions {
+    margin-top: 8px;
+}
+
+button {
+    color: var(--vscode-button-secondaryForeground);
+    background: var(--vscode-button-secondaryBackground);
+    border: none;
+    border-radius: 2px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9em;
+}
+
+button:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.buttons button:first-child {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+}
+
+.buttons button:first-child:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.meta button {
+    background: transparent;
+    color: var(--vscode-textLink-foreground);
+    padding: 0;
+}

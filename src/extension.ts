@@ -1,10 +1,15 @@
+import * as os from 'os';
 import * as vscode from 'vscode';
-import { TextEdit, addComment, commentOnNode, deleteThread, isCurrent, reply, resolveSuggestion, validateBody } from './markup/edits';
+import { Card, cards, short } from './markup/cards';
+import {
+    TextEdit, addComment, checkSelection, commentOnNode, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
+} from './markup/edits';
 import { parse } from './markup/parse';
 import { Decorations } from './ui/Decorations';
-import { ThreadManager } from './ui/ThreadManager';
+import { PanelMessage, ReviewPanel, VIEW_ID } from './ui/ReviewPanel';
 
 const DEBOUNCE_MS = 200;
+const STALE = 'The file changed since this thread was shown. Try again.';
 
 function today(): string {
     const d = new Date();
@@ -12,30 +17,101 @@ function today(): string {
 }
 
 function author(): string {
-    return vscode.workspace.getConfiguration('criticmarkReview').get<string>('author', '');
+    const configured = vscode.workspace.getConfiguration('criticmarkReview').get<string>('author', '');
+    if (configured) {
+        return configured;
+    }
+    try {
+        return os.userInfo().username || 'User';
+    } catch {
+        // os.userInfo() throws when the user has no name or home directory, e.g. in some containers.
+        return 'User';
+    }
 }
 
-function documentOf(uri: vscode.Uri): vscode.TextDocument | undefined {
-    return vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+// A comment being written in the panel for a selection. It reaches the file only on submit.
+interface Draft {
+    uri: string;
+    from: number;
+    to: number;
+    selected: string;
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-    const threads = new ThreadManager();
     const decorations = new Decorations();
     const timers = new Map<string, NodeJS.Timeout>();
-    // Text selected when Add Comment opened a thread, so a later submit can tell whether the text moved.
-    const selections = new WeakMap<vscode.CommentThread, string>();
-    context.subscriptions.push(threads, decorations);
+    // The markdown file the panel shows, and its cards as last drawn.
+    let current: vscode.TextDocument | undefined;
+    let shown: Card[] = [];
+    let draft: Draft | undefined;
+    let selected: string | undefined;
+    // Set while an edit runs, so a double click cannot write the same reply twice.
+    let busy = false;
 
-    const refresh = (document: vscode.TextDocument) => {
-        if (document.languageId !== 'markdown') {
-            return;
-        }
-        const parsed = threads.refresh(document);
+    const decorate = (document: vscode.TextDocument) => {
+        const parsed = parse(document.getText());
         for (const editor of vscode.window.visibleTextEditors) {
             if (editor.document === document) {
                 decorations.apply(editor, parsed);
             }
+        }
+        return parsed;
+    };
+
+    // Keeps the draft on its text while the file changes above it; drops it when its text itself changes.
+    const moveDraft = (target: Draft, changes: readonly vscode.TextDocumentContentChangeEvent[]) => {
+        let shift = 0;
+        for (const change of changes) {
+            const start = change.rangeOffset;
+            const end = start + change.rangeLength;
+            if (end <= target.from) {
+                shift += change.text.length - change.rangeLength;
+            } else if (start < target.to) {
+                draft = undefined;
+                vscode.window.showWarningMessage('The text you were commenting on changed, so the new comment was dropped.');
+                return;
+            }
+        }
+        target.from += shift;
+        target.to += shift;
+    };
+
+    const cardAtCursor = (): Card | undefined => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document !== current) {
+            return undefined;
+        }
+        const from = current.offsetAt(editor.selection.start);
+        const to = current.offsetAt(editor.selection.end);
+        return shown.find(c => from === to ? c.from < from && from < c.to : c.from < to && from < c.to);
+    };
+
+    // Switches the editor context menu between Add Comment and the actions for the markup under the cursor.
+    const updateCursorContext = () => {
+        const card = cardAtCursor();
+        const at = !card ? undefined : card.suggestion === null ? 'thread' : 'suggestion';
+        vscode.commands.executeCommand('setContext', 'criticmarkReview.at', at);
+        if (card && card.id !== selected) {
+            panel.select(card.id);
+        }
+        selected = card?.id;
+    };
+
+    const render = () => {
+        shown = current ? cards(decorate(current)) : [];
+        const showDraft = draft && current && draft.uri === current.uri.toString();
+        panel.render({
+            file: current ? current.uri.toString() : null,
+            cards: shown,
+            draft: showDraft ? { from: draft!.from, anchor: short(draft!.selected) } : null,
+        });
+        updateCursorContext();
+    };
+
+    const setCurrent = (editor: vscode.TextEditor | undefined) => {
+        if (editor) {
+            current = editor.document.languageId === 'markdown' ? editor.document : undefined;
+            render();
         }
     };
 
@@ -48,8 +124,7 @@ export function activate(context: vscode.ExtensionContext): void {
             return false;
         }
         if (!isCurrent(document.getText(), edit)) {
-            vscode.window.showWarningMessage('The file changed since this thread was shown. Try again.');
-            refresh(document);
+            vscode.window.showWarningMessage(STALE);
             return false;
         }
         const workspaceEdit = new vscode.WorkspaceEdit();
@@ -60,107 +135,214 @@ export function activate(context: vscode.ExtensionContext): void {
         if (ok && !document.isUntitled) {
             await document.save();
         }
-        refresh(document);
         return ok;
     };
 
-    const resolve = async (thread: vscode.CommentThread, accept: boolean) => {
-        const document = documentOf(thread.uri);
-        const parsed = document && threads.parsed(thread.uri);
-        const source = threads.sourceOf(thread);
-        if (document && parsed && source?.kind === 'suggestion') {
-            await applyEdit(document, () => resolveSuggestion(parsed, source.nodeIndex, accept));
+    // Finds a card again in the file as it is now, since the panel may show an older version.
+    // A reply may land on a thread that got new replies meanwhile; other actions need the card unchanged.
+    const locate = (id: string, allowNewReplies: boolean) => {
+        if (!current) {
+            return undefined;
+        }
+        const parsed = parse(current.getText());
+        const fresh = cards(parsed);
+        const card = fresh.find(c => c.id === id);
+        const seen = shown.find(c => c.id === id);
+        // With identical cards the occurrence number alone may point at another one, so the position must match too.
+        const key = id.slice(id.indexOf(':'));
+        const twins = fresh.filter(c => c.id.slice(c.id.indexOf(':')) === key).length > 1;
+        if (!card || !seen || (!allowNewReplies && card.raw !== seen.raw) || (twins && card.from !== seen.from)) {
+            vscode.window.showWarningMessage(STALE);
+            render();
+            return undefined;
+        }
+        return { document: current, parsed, card };
+    };
+
+    const reveal = async (card: Card) => {
+        if (!current) {
+            return;
+        }
+        const editor = vscode.window.visibleTextEditors.find(e => e.document === current)
+            ?? await vscode.window.showTextDocument(current, { preserveFocus: true });
+        const range = new vscode.Range(current.positionAt(card.from), current.positionAt(card.to));
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    };
+
+    // Returns whether the file was changed, so the panel can clear a text box only when its text was written.
+    const handle = async (message: PanelMessage): Promise<boolean> => {
+        if (message.type === 'ready' || busy) {
+            return false;
+        }
+        busy = true;
+        try {
+            return await run(message);
+        } finally {
+            busy = false;
+        }
+    };
+
+    const run = async (message: PanelMessage): Promise<boolean> => {
+        if (message.type === 'ready') {
+            return false;
+        }
+        if (message.type === 'reveal') {
+            const card = shown.find(c => c.id === message.id);
+            if (card) {
+                await reveal(card);
+            }
+            return false;
+        }
+        if (message.type === 'cancelDraft') {
+            draft = undefined;
+            render();
+            return false;
+        }
+        if (message.type === 'submitDraft') {
+            const target = draft;
+            if (!target || !current || target.uri !== current.uri.toString()) {
+                return false;
+            }
+            const document = current;
+            const build = () => addComment(
+                parse(document.getText()), target.from, target.to, message.body, author(), today(), target.selected);
+            const ok = await applyEdit(document, build);
+            if (ok) {
+                draft = undefined;
+            }
+            render();
+            return ok;
+        }
+        if (message.type === 'delete') {
+            const answer = await vscode.window.showWarningMessage(
+                'Delete this thread?', { modal: true, detail: 'All its comments are removed from the file.' }, 'Delete');
+            if (answer !== 'Delete') {
+                return false;
+            }
+        }
+        const found = locate(message.id, message.type === 'reply');
+        if (!found) {
+            return false;
+        }
+        const { document, parsed, card } = found;
+        const thread = card.thread === null ? undefined : parsed.threads[card.thread];
+        let ok = false;
+        switch (message.type) {
+            case 'reply':
+                ok = await applyEdit(document, () => thread
+                    ? reply(parsed, thread, message.body, author(), today())
+                    : commentOnNode(parsed, card.suggestion!, message.body, author(), today()));
+                break;
+            case 'edit': {
+                const comment = card.comments[message.position];
+                if (comment) {
+                    ok = await applyEdit(document, () => editComment(parsed, comment.nodeIndex, message.body));
+                }
+                break;
+            }
+            case 'delete':
+                if (thread) {
+                    ok = await applyEdit(document, () => deleteThread(parsed, thread));
+                }
+                break;
+            case 'accept':
+            case 'reject':
+                if (card.suggestion !== null) {
+                    ok = await applyEdit(document, () => resolveSuggestion(parsed, card.suggestion!, message.type === 'accept'));
+                }
+                break;
+            case 'resolve':
+                if (thread) {
+                    ok = await applyEdit(document, () => setResolved(parsed, thread, message.resolved));
+                }
+                break;
+        }
+        render();
+        return ok;
+    };
+
+    const panel = new ReviewPanel(context.extensionUri, async message => {
+        const ok = await handle(message);
+        if (message.type === 'reply' || message.type === 'edit' || message.type === 'submitDraft') {
+            panel.result(ok);
+        }
+    });
+
+    const atCursor = (type: 'delete' | 'accept' | 'reject') => () => {
+        const card = cardAtCursor();
+        if (card) {
+            void handle({ type, id: card.id });
         }
     };
 
     context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(refresh),
-        vscode.workspace.onDidCloseTextDocument(d => threads.forget(d.uri)),
+        decorations,
+        vscode.window.registerWebviewViewProvider(VIEW_ID, panel, { webviewOptions: { retainContextWhenHidden: true } }),
+        vscode.window.onDidChangeActiveTextEditor(setCurrent),
+        vscode.window.onDidChangeTextEditorSelection(updateCursorContext),
         vscode.workspace.onDidChangeTextDocument(e => {
-            const key = e.document.uri.toString();
-            clearTimeout(timers.get(key));
-            timers.set(key, setTimeout(() => refresh(e.document), DEBOUNCE_MS));
-        }),
-        vscode.window.onDidChangeVisibleTextEditors(editors => {
-            for (const editor of editors) {
-                const parsed = threads.parsed(editor.document.uri);
-                if (parsed) {
-                    decorations.apply(editor, parsed);
-                }
-            }
-        }),
-
-        vscode.commands.registerCommand('criticmarkReview.addComment', () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
+            if (e.document.languageId !== 'markdown') {
                 return;
             }
-            const thread = threads.controller.createCommentThread(editor.document.uri, editor.selection, []);
-            selections.set(thread, editor.document.getText(editor.selection));
-            thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+            const key = e.document.uri.toString();
+            if (draft?.uri === key) {
+                moveDraft(draft, e.contentChanges);
+            }
+            clearTimeout(timers.get(key));
+            timers.set(key, setTimeout(() => e.document === current ? render() : decorate(e.document), DEBOUNCE_MS));
+        }),
+        vscode.workspace.onDidCloseTextDocument(document => {
+            if (draft?.uri === document.uri.toString()) {
+                draft = undefined;
+            }
+            if (document === current) {
+                current = undefined;
+                render();
+            }
+        }),
+        vscode.window.onDidChangeVisibleTextEditors(editors => {
+            editors.filter(e => e.document.languageId === 'markdown').forEach(e => decorations.apply(e, parse(e.document.getText())));
         }),
 
-        vscode.commands.registerCommand('criticmarkReview.reply', async (commentReply: vscode.CommentReply) => {
-            const { thread, text: body } = commentReply;
-            const error = validateBody(body);
+        vscode.commands.registerCommand('criticmarkReview.addComment', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'markdown') {
+                return;
+            }
+            const document = editor.document;
+            const from = document.offsetAt(editor.selection.start);
+            const to = document.offsetAt(editor.selection.end);
+            // The menu may still show Add Comment when the right-click just moved the cursor into markup.
+            const inside = cardAtCursor();
+            if (inside) {
+                await panel.focus(inside.id);
+                return;
+            }
+            const error = checkSelection(parse(document.getText()), from, to);
             if (error) {
                 vscode.window.showErrorMessage(error);
                 return;
             }
-            const document = documentOf(thread.uri);
-            const parsed = document && threads.parsed(thread.uri);
-            if (!document || !parsed) {
-                return;
-            }
-            const source = threads.sourceOf(thread);
-            if (!source) {
-                // A new thread: write it, then the rebuild shows the real one.
-                const start = document.offsetAt(thread.range?.start ?? new vscode.Position(0, 0));
-                const end = document.offsetAt(thread.range?.end ?? new vscode.Position(0, 0));
-                const selected = selections.get(thread);
-                // A gutter thread has no remembered selection and may span whole lines: comment at its end, no highlight.
-                const from = selected === undefined ? end : start;
-                const build = () => addComment(parse(document.getText()), from, end, body, author(), today(), selected);
-                if (await applyEdit(document, build)) {
-                    thread.dispose();
-                }
-                return;
-            }
-            const target = source.kind === 'thread'
-                ? parsed.threads[source.index]
-                : parsed.threads.find(t => t.anchorIndex === source.nodeIndex);
-            if (target) {
-                await applyEdit(document, () => reply(parsed, target, body, author(), today()));
-            } else if (source.kind === 'suggestion') {
-                // First comment on a bare suggestion: append it right after the suggestion.
-                await applyEdit(document, () => commentOnNode(parsed, source.nodeIndex, body, author(), today()));
-            }
+            current = document;
+            draft = { uri: document.uri.toString(), from, to, selected: document.getText(editor.selection) };
+            render();
+            await panel.focus(null);
         }),
-
-        vscode.commands.registerCommand('criticmarkReview.deleteThread', async (thread: vscode.CommentThread) => {
-            const source = threads.sourceOf(thread);
-            const document = documentOf(thread.uri);
-            const parsed = document && threads.parsed(thread.uri);
-            if (!source) {
-                thread.dispose();
-                return;
+        // Both open the card under the cursor with the focus in its reply box; the titles differ for threads and suggestions.
+        ...['criticmarkReview.openReply', 'criticmarkReview.commentSuggestion'].map(id => vscode.commands.registerCommand(id, async () => {
+            const card = cardAtCursor();
+            if (card) {
+                await panel.focus(card.id);
             }
-            if (!document || !parsed) {
-                return;
-            }
-            const target = source.kind === 'thread'
-                ? parsed.threads[source.index]
-                : parsed.threads.find(t => t.anchorIndex === source.nodeIndex);
-            if (target) {
-                await applyEdit(document, () => deleteThread(parsed, target));
-            }
-        }),
-
-        vscode.commands.registerCommand('criticmarkReview.accept', (thread: vscode.CommentThread) => resolve(thread, true)),
-        vscode.commands.registerCommand('criticmarkReview.reject', (thread: vscode.CommentThread) => resolve(thread, false)),
+        })),
+        vscode.commands.registerCommand('criticmarkReview.deleteThread', atCursor('delete')),
+        vscode.commands.registerCommand('criticmarkReview.accept', atCursor('accept')),
+        vscode.commands.registerCommand('criticmarkReview.reject', atCursor('reject')),
     );
 
-    vscode.workspace.textDocuments.forEach(refresh);
+    vscode.window.visibleTextEditors.filter(e => e.document.languageId === 'markdown').forEach(e => decorate(e.document));
+    setCurrent(vscode.window.activeTextEditor);
 }
 
 export function deactivate(): void {}

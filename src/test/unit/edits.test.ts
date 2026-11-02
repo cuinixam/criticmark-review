@@ -1,7 +1,8 @@
 import * as assert from 'assert';
 import { parse } from '../../markup/parse';
 import {
-    TextEdit, addComment, checkSelection, commentMarkup, commentOnNode, deleteThread, isCurrent, reply, resolveSuggestion, validateBody,
+    TextEdit, addComment, checkSelection, commentMarkup, commentOnNode, deleteThread, editComment, isCurrent, reply, resolveSuggestion,
+    setResolved, validateBody,
 } from '../../markup/edits';
 
 const DATE = '2026-11-02';
@@ -106,6 +107,31 @@ suite('edits', () => {
             const parsed = parse(text);
             const index = parsed.nodes.findIndex(n => n.kind !== 'comment');
             assert.strictEqual(apply(text, resolveSuggestion(parsed, index, accept)), expected);
+        });
+    }
+
+    test('editComment replaces only the text', () => {
+        const text = 'a {==x==}{author="Max" date="2026-11-01">>old<<}{>>Claude: r<<} b';
+        const parsed = parse(text);
+        assert.strictEqual(apply(text, editComment(parsed, 1, 'new')), 'a {==x==}{author="Max" date="2026-11-01">>new<<}{>>Claude: r<<} b');
+        assert.strictEqual(apply(text, editComment(parsed, 2, 'again')), 'a {==x==}{author="Max" date="2026-11-01">>old<<}{>>Claude: again<<} b');
+        assert.throws(() => editComment(parsed, 1, 'a <<} b'));
+    });
+
+    const resolveCases: [string, boolean, string][] = [
+        ['{==x==}{author="Max" date="2026-11-01">>c<<}{>>r<<}', true, '{==x==}{author="Max" date="2026-11-01" status="resolved">>c<<}{>>r<<}'],
+        ['{==x==}{>>c<<}', true, '{==x==}{status="resolved">>c<<}'],
+        ['{==x==}{author="Max" status="resolved" date="2026-11-01">>c<<}', false, '{==x==}{author="Max" date="2026-11-01">>c<<}'],
+        ['{==x==}{status="resolved">>c<<}', false, '{==x==}{>>c<<}'],
+        ['{==x==}{status="resolved">>c<<}', true, '{==x==}{status="resolved">>c<<}'],
+        ['{==x==}{Status="resolved">>c<<}', false, '{==x==}{>>c<<}'],
+    ];
+    for (const [text, resolved, expected] of resolveCases) {
+        test(`setResolved ${resolved} on ${text}`, () => {
+            const parsed = parse(text);
+            const result = apply(text, setResolved(parsed, parsed.threads[0], resolved));
+            assert.strictEqual(result, expected);
+            assert.strictEqual(parse(result).nodes[1].status === 'resolved', resolved);
         });
     }
 
