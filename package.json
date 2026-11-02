@@ -3,7 +3,7 @@
   "displayName": "CriticMark Review",
   "publisher": "cuinixam",
   "description": "Review CriticMarkup comments and suggestions in markdown files from a side panel, compatible with the Obsidian Track Changes plugin.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "repository": {
     "type": "git",
