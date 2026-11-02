@@ -50,3 +50,8 @@ Every push to `main` runs the tests and then [semantic-release](https://semantic
 ## For AI agents
 
 [docs/format.md](docs/format.md) describes the syntax, how threads are grouped, and how to reply, accept and reject.
+
+## Credits
+
+- [CriticMarkup](https://github.com/CriticMarkup/CriticMarkup-toolkit) by Gabe Weatherhead and Erik Hess is the base format.
+- The [Track Changes plugin](https://obsidian.md/plugins?id=track-changes) for Obsidian by Phil Baum adds the `author` and `date` attributes, comment threads and the `{=+…+=}` element. This extension follows the plugin's behaviour so that a file reviewed in VS Code can be continued in Obsidian, and the other way round.
