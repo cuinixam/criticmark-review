@@ -2,13 +2,17 @@
 
 Review CriticMarkup comments and suggestions in markdown files from a side panel in VS Code. You never edit the markup by hand: the extension writes it for you. Files stay compatible with the Track Changes plugin for Obsidian, and an AI agent can reply by editing the same file.
 
+![The Review panel next to a markdown file with an open thread, two suggestions and a resolved thread](docs/images/review-panel.png)
+
 ## What it does
 
 - The **Review** panel in the right side bar lists every thread and suggestion of the active markdown file. If you do not see it, run **View: Open View…** and choose **Threads**.
 - Select text, right-click, **Add Comment**. A new card opens in the panel with the cursor in its text box. Press **Comment** or `Cmd+Enter` (`Ctrl+Enter` on Windows and Linux) to write it to the file, or **Cancel** or `Escape` to drop it.
+
+  ![The editor's right-click menu with Add Comment](docs/images/add-comment.png)
 - Click a card's header to expand or collapse it and to jump to its text. Expanded, a card shows every comment and a reply box. The **…** menu on a comment has **Edit** and **Delete comment**; deleting the last comment deletes the thread. The **…** menu on a card's header has **Delete thread**.
 - Suggestions show the change as a small diff with **Accept** and **Reject**.
-- Click the check circle on a card to mark the thread as resolved. The card and its highlight turn green and the card collapses. Click it again to reopen the thread.
+- Click the check circle on a card to mark the thread as resolved. The card turns green and collapses, and its highlight in the editor gets a green underline. Click it again to reopen the thread.
 - The panel's title bar has **Hide Resolved Threads**, **Expand All** and **Collapse All**.
 - Right-click inside a comment for **Reply** and **Delete Thread**, or inside a suggestion for **Comment on Suggestion**, **Accept** and **Reject**.
 - Suggestions (`{++…++}`, `{--…--}`, `{~~…~>…~~}`) are coloured in the editor.
@@ -41,6 +45,7 @@ Every push to `main` runs the tests and then [semantic-release](https://semantic
 ## Settings
 
 - `criticmarkReview.author`: the name written into new comments and replies. When empty, your system user name is used, or `User` if there is none.
+- Colours: change `criticmarkReview.highlightBackground` (highlighted text) and `criticmarkReview.resolvedBackground` (resolved cards) under `workbench.colorCustomizations`.
 
 ## For AI agents
 
