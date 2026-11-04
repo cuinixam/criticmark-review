@@ -126,6 +126,7 @@
                 area.value = '';
                 area.blur();
                 update();
+                vscode.postMessage({ type: 'focusEditor' });
             }
         };
         area.addEventListener('keydown', event => {

@@ -23,7 +23,8 @@ export type PanelMessage =
     | { type: 'reject'; id: string }
     | { type: 'resolve'; id: string; resolved: boolean }
     | { type: 'submitDraft'; body: string }
-    | { type: 'cancelDraft' };
+    | { type: 'cancelDraft' }
+    | { type: 'focusEditor' };
 
 // The side panel. It only draws state and forwards clicks; extension.ts turns them into file edits.
 export class ReviewPanel implements vscode.WebviewViewProvider {

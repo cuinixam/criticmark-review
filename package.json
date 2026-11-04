@@ -231,7 +231,27 @@
           "group": "navigation@4"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "criticmarkReview.addComment",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && editorLangId == markdown && !criticmarkReview.at"
+      },
+      {
+        "command": "criticmarkReview.openReply",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && editorLangId == markdown && criticmarkReview.at == thread"
+      },
+      {
+        "command": "criticmarkReview.commentSuggestion",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && editorLangId == markdown && criticmarkReview.at == suggestion"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

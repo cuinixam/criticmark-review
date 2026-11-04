@@ -197,6 +197,9 @@ export function activate(context: vscode.ExtensionContext): void {
             }
             return false;
         }
+        if (message.type === 'focusEditor') {
+            return false;
+        }
         if (message.type === 'setHideResolved') {
             setHideResolved(message.hide);
             return false;
@@ -282,6 +285,11 @@ export function activate(context: vscode.ExtensionContext): void {
         const ok = await handle(message);
         if (message.type === 'reply' || message.type === 'edit' || message.type === 'submitDraft') {
             panel.result(ok);
+        }
+        // Hand the keyboard back to the file after a comment, so a review needs no mouse.
+        if (current && ((ok && (message.type === 'reply' || message.type === 'submitDraft')) || message.type === 'cancelDraft' || message.type === 'focusEditor')) {
+            const editor = vscode.window.visibleTextEditors.find(e => e.document === current);
+            await vscode.window.showTextDocument(current, editor?.viewColumn);
         }
     });
 
