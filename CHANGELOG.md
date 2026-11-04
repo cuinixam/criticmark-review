@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/cuinixam/criticmark-review/compare/v0.2.0...v0.3.0) (2026-11-04)
+
+
+### Features
+
+* add comment shortcut and return focus to the editor ([f5919b5](https://github.com/cuinixam/criticmark-review/commit/f5919b54978032b93d3fea65d5f04347eda6f922))
+
 # [0.2.0](https://github.com/cuinixam/criticmark-review/compare/v0.1.1...v0.2.0) (2026-11-02)
 
 
