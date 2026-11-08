@@ -23,8 +23,7 @@ export interface Card {
     // The text a suggestion removes and adds, null for the side it does not have; null when the card is not a suggestion.
     change: { old: string | null; new: string | null } | null;
     comments: CardComment[];
-    // Sidecar cards only: `from` and `to` are positions in the source, and this is the card's range in the sidecar.
-    entry?: { from: number; to: number };
+    // Sidecar cards only. Their `from` and `to` are positions in the source; `raw` is still the text in the sidecar.
     orphaned?: boolean;
     ambiguous?: boolean;
 }

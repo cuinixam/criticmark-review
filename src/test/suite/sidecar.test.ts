@@ -98,6 +98,56 @@ suite('Sidecar review', () => {
         assert.strictEqual(fs.readFileSync(sidecar, 'utf8'), other);
     });
 
+    test('an agent write during an accept keeps its entry and removes the accepted one', async () => {
+        const accepted = '{line="1"~~static int x;~>int x;~~}\n';
+        const { api, file, sidecar } = await open(SOURCE, accepted);
+        await until(() => api.cards().length === 1);
+        const added = '{line="3"==int first==}{author="Agent" date="2026-11-08">>New<<}\n\n';
+        const listener = vscode.workspace.onWillSaveTextDocument(() => fs.writeFileSync(sidecar, added + accepted));
+        try {
+            assert.strictEqual(await api.handle({ type: 'accept', id: api.cards()[0].id }), true);
+        } finally {
+            listener.dispose();
+        }
+        assert.ok(fs.readFileSync(file, 'utf8').startsWith('int x;\n'));
+        assert.strictEqual(fs.readFileSync(sidecar, 'utf8').trim(), added.trim());
+    });
+
+    test('a comment is not written when the source cannot be saved', async () => {
+        const { api, editor, file, sidecar } = await open(SOURCE);
+        await editor.edit(b => b.insert(new vscode.Position(1, 0), '// new\n'));
+        fs.chmodSync(file, 0o444);
+        editor.selection = new vscode.Selection(0, 0, 0, 6);
+        await vscode.commands.executeCommand('criticmarkReview.addComment');
+        assert.strictEqual(await api.handle({ type: 'submitDraft', body: 'Why?' }), false);
+        assert.strictEqual(fs.existsSync(sidecar), false);
+    });
+
+    test('an agent edit keeping the anchor makes an older card stale', async () => {
+        const { api, sidecar } = await open(SOURCE, REVIEW);
+        await until(() => api.cards().length === 1);
+        const { id } = api.cards()[0];
+        const other = REVIEW.replace('Why static?', 'Edited by the agent');
+        fs.writeFileSync(sidecar, other);
+        assert.strictEqual(await api.handle({ type: 'resolve', id, resolved: true }), false);
+        assert.strictEqual(fs.readFileSync(sidecar, 'utf8'), other);
+    });
+
+    test('an agent write to a sidecar in the workspace shows up without a reload', async () => {
+        const dir = fs.mkdtempSync(path.join(FIXTURES, 'tmp-'));
+        try {
+            const file = path.join(dir, 'watched.c');
+            fs.writeFileSync(file, SOURCE);
+            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file));
+            const api = await vscode.extensions.getExtension('cuinixam.criticmark-review')!.activate() as Api;
+            await until(() => api.cards().length === 0);
+            fs.writeFileSync(`${file}.review`, REVIEW);
+            await until(() => api.cards().length === 1);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     test('an empty extension list limits the review to markdown', async () => {
         const config = vscode.workspace.getConfiguration('criticmarkReview');
         await config.update('sidecarExtensions', [], vscode.ConfigurationTarget.Global);

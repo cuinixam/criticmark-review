@@ -5,7 +5,7 @@ import {
     TextEdit, addComment, checkSelection, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
 } from './markup/edits';
 import { parse } from './markup/parse';
-import { acceptEdit, addEntry, cardAt, placeCards, quoteAt, removeEntry, sidecarEnabled } from './markup/sidecar';
+import { acceptEdit, addEntry, cardAt, entryOf, placeCards, quoteAt, removeEntry, sidecarEnabled } from './markup/sidecar';
 import { Decorations } from './ui/Decorations';
 import { PanelMessage, ReviewPanel, VIEW_ID } from './ui/ReviewPanel';
 
@@ -311,8 +311,10 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                 parse(document.getText()), target.from, target.to, message.body, author(), today(), target.selected);
             if (usesSidecar(document)) {
                 // The agent looks for the quote on disk. A save can also reformat the text and drop the draft.
-                if (document.isDirty) {
-                    await document.save();
+                if (document.isDirty && !await document.save()) {
+                    vscode.window.showErrorMessage('The file could not be saved, so the comment was not written.');
+                    render();
+                    return false;
                 }
                 if (draft !== target || !await loadSidecar(document)) {
                     render();
@@ -347,7 +349,7 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
         const { document, parsed, card } = found;
         const thread = card.thread === null ? undefined : parsed.threads[card.thread];
         const sidecar = usesSidecar(document);
-        const removeCard = () => removeEntry(sidecarText(document), card.entry!);
+        const removeCard = () => removeEntry(sidecarText(document), entryOf(sidecarText(document), card.raw));
         // On a suggestion, deleting the discussion keeps the suggestion, as it does inline.
         const removesEntry = sidecar && card.suggestion === null;
         let ok = false;
@@ -381,8 +383,15 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                 if (card.suggestion !== null) {
                     if (!sidecar) {
                         ok = await applyEdit(document, () => resolveSuggestion(parsed, card.suggestion!, message.type === 'accept'));
-                    } else if (message.type === 'reject' || await applyEdit(document, () => acceptEdit(parsed, card, document.getText()))) {
+                    } else if (message.type === 'reject') {
                         ok = await writeSidecar(document, removeCard);
+                    } else if (await applyEdit(document, () => acceptEdit(parsed, card, document.getText()))) {
+                        // The save can take a while, and the agent may write to the sidecar meanwhile.
+                        if (document.isDirty) {
+                            vscode.window.showErrorMessage('The file could not be saved, so the suggestion was kept.');
+                        } else if (await loadSidecar(document)) {
+                            ok = await writeSidecar(document, removeCard);
+                        }
                     }
                 }
                 break;
