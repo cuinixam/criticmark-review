@@ -263,7 +263,7 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
         }
         const range = new vscode.Range(current.positionAt(card.from), current.positionAt(card.to));
         editor.selection = new vscode.Selection(range.start, range.end);
-        editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        editor.revealRange(range, vscode.TextEditorRevealType.AtTop);
     };
 
     // Returns whether the file was changed, so the panel can clear a text box only when its text was written.

@@ -11,7 +11,7 @@ Review CriticMarkup comments and suggestions in markdown files from a side panel
 - Without the mouse: select text and press `Cmd+Alt+M` (`Ctrl+Alt+M` on Windows and Linux). Inside a comment or a suggestion, the same key opens its reply box. After you comment, reply or cancel, the cursor goes back to the file.
 
   ![The editor's right-click menu with Add Comment](docs/images/add-comment.png)
-- Click a card's header to expand or collapse it and to jump to its text. Expanded, a card shows every comment and a reply box. The **…** menu on a comment has **Edit** and **Delete comment**; deleting the last comment deletes the thread. The **…** menu on a card's header has **Delete thread**.
+- Click a card's header to expand or collapse it and to bring its text to the top of the editor. The selected card has a coloured border and a bar on its left edge. Expanded, a card shows every comment and a reply box. The **…** menu on a comment has **Edit** and **Delete comment**; deleting the last comment deletes the thread. The **…** menu on a card's header has **Delete thread**.
 - Suggestions show the change as a small diff with **Accept** and **Reject**.
 - Click the check circle on a card to mark the thread as resolved. The card turns green and collapses, and its highlight in the editor gets a green underline. Click it again to reopen the thread.
 - The panel's title bar has **Hide Resolved Threads**, **Expand All** and **Collapse All**.
