@@ -5,7 +5,7 @@ import {
     TextEdit, addComment, checkSelection, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
 } from './markup/edits';
 import { parse } from './markup/parse';
-import { acceptEdit, addEntry, cardAt, entryOf, placeCards, quoteAt, removeEntry, sidecarEnabled } from './markup/sidecar';
+import { acceptEdit, addEntry, cardAt, contextAt, entryOf, placeCards, quoteAt, removeEntry, sidecarEnabled } from './markup/sidecar';
 import { Decorations } from './ui/Decorations';
 import { PanelMessage, ReviewPanel, VIEW_ID } from './ui/ReviewPanel';
 
@@ -257,7 +257,8 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
         }
         const editor = vscode.window.visibleTextEditors.find(e => e.document === current)
             ?? await vscode.window.showTextDocument(current, { preserveFocus: true });
-        if (card.from === card.to) {
+        // Whole-file and orphaned cards have no place to jump to.
+        if (card.from === 0 && card.to === 0) {
             return;
         }
         const range = new vscode.Range(current.positionAt(card.from), current.positionAt(card.to));
@@ -320,8 +321,8 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                     render();
                     return false;
                 }
-                const line = target.selected ? document.positionAt(target.from).line + 1 : null;
-                build = () => addEntry(sidecarText(document), target.selected, line, message.body, author(), today());
+                const place = contextAt(document.getText(), target.from, target.to);
+                build = () => addEntry(sidecarText(document), target.selected, place, message.body, author(), today());
             }
             const ok = await applyReview(document, build);
             if (ok) {

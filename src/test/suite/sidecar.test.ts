@@ -52,7 +52,18 @@ suite('Sidecar review', () => {
         await vscode.commands.executeCommand('criticmarkReview.addComment');
         assert.strictEqual(await api.handle({ type: 'submitDraft', body: 'Why?' }), true);
         assert.ok(fs.readFileSync(file, 'utf8').includes('// new'));
-        assert.match(fs.readFileSync(sidecar, 'utf8'), /^\{line="1"==static==\}\{author="[^"]*" date="[^"]*">>Why\?<<\}\n$/);
+        assert.match(fs.readFileSync(sidecar, 'utf8'), /^\{line="1" after="[0-9a-f]{8}"==static==\}\{author="[^"]*" date="[^"]*">>Why\?<<\}\n$/);
+    });
+
+    test('a comment on a blank line stays on that line', async () => {
+        const { api, editor, sidecar } = await open(SOURCE);
+        editor.selection = new vscode.Selection(1, 0, 1, 0);
+        await vscode.commands.executeCommand('criticmarkReview.addComment');
+        assert.strictEqual(await api.handle({ type: 'submitDraft', body: 'Here' }), true);
+        await until(() => api.cards().length === 1);
+        const offset = SOURCE.indexOf('\n') + 1;
+        assert.deepStrictEqual([api.cards()[0].from, api.cards()[0].to], [offset, offset]);
+        assert.match(fs.readFileSync(sidecar, 'utf8'), /^\{line="2" before="[0-9a-f]+" after="[0-9a-f]+" author=/);
     });
 
     test('a reply goes to the sidecar and leaves the source alone', async () => {

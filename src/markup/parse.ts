@@ -16,6 +16,9 @@ export interface MarkupNode {
     status: string | null;
     // First source line of a sidecar anchor; a hint for telling repeated text apart.
     line: number | null;
+    // Hashes of the nearest non-blank lines around a sidecar anchor, for finding it again after the code moved.
+    before: string | null;
+    after: string | null;
 }
 
 export interface Thread {
@@ -133,6 +136,8 @@ function toNode(kind: Kind, m: RegExpMatchArray): MarkupNode {
         date: attrs.date ?? null,
         status: attrs.status ?? null,
         line: /^\d+$/.test(attrs.line ?? '') ? Number(attrs.line) : null,
+        before: attrs.before ?? null,
+        after: attrs.after ?? null,
     };
     if (kind === 'substitution') {
         node.oldText = m[2];
