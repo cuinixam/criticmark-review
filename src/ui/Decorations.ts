@@ -26,6 +26,20 @@ export class Decorations implements vscode.Disposable {
         textDecoration: 'underline dotted',
     });
 
+    private readonly selected: vscode.TextEditorDecorationType;
+
+    constructor(extensionUri: vscode.Uri) {
+        this.selected = vscode.window.createTextEditorDecorationType({
+            light: { gutterIconPath: vscode.Uri.joinPath(extensionUri, 'media', 'mark-light.svg'), gutterIconSize: 'contain' },
+            dark: { gutterIconPath: vscode.Uri.joinPath(extensionUri, 'media', 'mark-dark.svg'), gutterIconSize: 'contain' },
+        });
+    }
+
+    // Shows which line the selected card belongs to. An image cannot use a theme colour, so it has a light and a dark version.
+    mark(editor: vscode.TextEditor, position: vscode.Position | undefined): void {
+        editor.setDecorations(this.selected, position ? [new vscode.Range(position, position)] : []);
+    }
+
     apply(editor: vscode.TextEditor, parsed: Parsed): void {
         const doc = editor.document;
         const range = (from: number, to: number) => new vscode.Range(doc.positionAt(from), doc.positionAt(to));
@@ -109,6 +123,6 @@ export class Decorations implements vscode.Disposable {
     }
 
     dispose(): void {
-        [this.inserted, this.removed, this.highlight, this.aitext, this.resolved].forEach(d => d.dispose());
+        [this.inserted, this.removed, this.highlight, this.aitext, this.resolved, this.selected].forEach(d => d.dispose());
     }
 }
