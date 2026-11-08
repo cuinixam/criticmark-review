@@ -14,6 +14,8 @@ export interface MarkupNode {
     author: string | null;
     date: string | null;
     status: string | null;
+    // First source line of a sidecar anchor; a hint for telling repeated text apart.
+    line: number | null;
 }
 
 export interface Thread {
@@ -130,6 +132,7 @@ function toNode(kind: Kind, m: RegExpMatchArray): MarkupNode {
         author: attrs.author ?? null,
         date: attrs.date ?? null,
         status: attrs.status ?? null,
+        line: /^\d+$/.test(attrs.line ?? '') ? Number(attrs.line) : null,
     };
     if (kind === 'substitution') {
         node.oldText = m[2];
@@ -145,16 +148,35 @@ function toNode(kind: Kind, m: RegExpMatchArray): MarkupNode {
     return node;
 }
 
-export function parse(text: string): Parsed {
-    const code = codeRanges(text);
+// One element at a time from left to right, so code in a quote that looks like markup cannot run on into a later entry.
+function scan(text: string): MarkupNode[] {
+    const nodes: MarkupNode[] = [];
+    let pos = 0;
+    for (;;) {
+        let first: [Kind, RegExpExecArray] | undefined;
+        for (const [kind, re] of PATTERNS) {
+            re.lastIndex = pos;
+            const m = re.exec(text);
+            // matchAll in the inline path starts from this shared lastIndex.
+            re.lastIndex = 0;
+            if (m && (!first || m.index < first[1].index)) {
+                first = [kind, m];
+            }
+        }
+        if (!first) {
+            return nodes;
+        }
+        nodes.push(toNode(first[0], first[1]));
+        pos = first[1].index + first[1][0].length;
+    }
+}
+
+// A sidecar quotes source text, so code detection is off for it. Inline parsing mirrors the Obsidian plugin.
+export function parse(text: string, sidecar = false): Parsed {
+    const code = sidecar ? [] : codeRanges(text);
     const inCode = (pos: number) => code.some(([a, b]) => pos >= a && pos < b);
 
-    const found: MarkupNode[] = [];
-    for (const [kind, re] of PATTERNS) {
-        for (const m of text.matchAll(re)) {
-            found.push(toNode(kind, m));
-        }
-    }
+    const found = sidecar ? scan(text) : PATTERNS.flatMap(([kind, re]) => [...text.matchAll(re)].map(m => toNode(kind, m)));
     found.sort((a, b) => a.from - b.from);
 
     const nodes: MarkupNode[] = [];
