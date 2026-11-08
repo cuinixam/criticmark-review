@@ -25,13 +25,13 @@ The extension saves the file after each change, so an agent reading the file on 
 
 Code files cannot hold CriticMarkup without breaking their syntax, so the review of any other text file lives in a sidecar file next to it: `foo.c.review` for `foo.c`. You review the same way, from the same panel, and never open the sidecar. An agent reads it and replies in it. Markdown is always reviewed inline.
 
-With no selection, a new comment quotes the current line. On a blank line it applies to the whole file. Unlike in markdown, you can comment anywhere, including on code that already has a comment.
+With no selection, a new comment quotes the current line, and on a blank line it stays on that line. For a comment about the whole file, comment on the first line and say so. Unlike in markdown, you can comment anywhere, including on code that already has a comment.
 
 The differences from markdown:
 
 - Your file only changes when you press **Accept**. Until then the new text of a replacement is drawn by the editor after the old text, and only its first line. The full text is on the card.
-- A thread finds its place by searching for the code it quotes. If that code is rewritten or reformatted, the card shows **Orphaned** and has no highlight. **Accept** is refused for it.
-- **Accept** is also refused when the same code appears several times and none of the copies is on the line the suggestion names.
+- A thread finds its place by searching for the code it quotes, and uses the lines around it to tell repeated code apart. If that code is rewritten or reformatted, the card shows **Orphaned** and has no highlight. **Accept** is refused for it.
+- **Accept** is also refused when the same code appears several times and the lines around it do not identify the copy.
 - `Cmd+Z` does not reach the sidecar, as with a pull request review. Comments can be edited or deleted and threads reopened, but a delete is final. After **Accept**, undo in the file restores the code and the suggestion stays gone.
 
 Sidecar files are normal files in your repository. Do not add them to `.gitignore`, because that would hide open review comments, and remove them before you push. Agent replies appear at once for files in your workspace; for a file outside it, switch back to its editor.

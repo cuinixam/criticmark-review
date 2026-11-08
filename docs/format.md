@@ -98,8 +98,9 @@ The file is a list of entries separated by blank lines:
 The elements, attributes, threads, replies and resolved state are the ones described above, with these differences:
 
 - The quoted text in a highlight, a deletion or the old part of a replacement is the anchor: the exact text of the source. It may span lines. To remove a whole line, include its line break in the quote.
-- `line="N"` is required on every anchor and is the first line of the quote in the source. It is only used to tell repeated text apart.
-- A comment with no anchor applies to the whole file.
+- `line="N"` is required on every anchor and is the first line of the quote in the source. It tells repeated text apart and goes stale when the code moves.
+- `before` and `after` are optional. Each is the first 8 hex digits of the SHA-1 of the nearest non-blank line before or after the quote, without its indentation. The extension writes them, and they find the right copy of repeated text after the code moved. You may leave them out.
+- A comment with `line` and no anchor sits on that blank line: `{line="40" before="e5f6a1b2" after="0a7bc3d4" author="Max" date="2026-11-08">>Text<<}`. A comment with neither applies to the whole file.
 - Do not write a bare `{++text++}`, because it has nothing in the source to attach to. To add code, write a replacement of the neighbouring line.
 - `{=+text+=}` is not used.
 - Nothing counts as code: markup-like text inside backticks or fences is read as it is in a normal element.

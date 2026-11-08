@@ -114,6 +114,11 @@ export function deleteComment(parsed: Parsed, thread: Thread, nodeIndex: number)
         const next = parsed.nodes[ids[1]];
         [from, to] = [node.from, next.to];
         insert = node.status === 'resolved' ? withStatus(next, true) : next.raw;
+        // A sidecar comment on a blank line holds its place itself, so the next comment takes it over.
+        const place = node.meta.match(/(?:line|before|after)="[^"]*"/g);
+        if (place) {
+            insert = `{${place.join(' ')} ${insert.slice(1)}`;
+        }
     } else {
         [from, to, insert] = [parsed.nodes[ids[position - 1]].to, node.to, ''];
     }
