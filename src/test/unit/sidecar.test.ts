@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import { Card } from '../../markup/cards';
 import { TextEdit } from '../../markup/edits';
 import { parse } from '../../markup/parse';
-import { acceptEdit, addEntry, cardAt, findQuote, placeCards, quoteAt, removeEntry, sidecarEnabled } from '../../markup/sidecar';
+import { acceptEdit, addEntry, cardAt, entryOf, findQuote, placeCards, quoteAt, removeEntry, sidecarEnabled } from '../../markup/sidecar';
 
 function apply(text: string, edit: TextEdit): string {
     return text.slice(0, edit.from) + edit.insert + text.slice(edit.to);
@@ -16,6 +16,19 @@ suite('sidecar edits and selection', () => {
         assert.strictEqual(sidecarEnabled('/a/foo.py', ['py']), true);
         assert.strictEqual(sidecarEnabled('/a/foo.c', ['.py']), false);
         assert.strictEqual(sidecarEnabled('/a/foo.c.review', ['*']), false);
+    });
+
+    test('sidecarEnabled treats a malformed setting as no extensions', () => {
+        assert.strictEqual(sidecarEnabled('/a/foo.c', '.c' as unknown as string[]), false);
+        assert.strictEqual(sidecarEnabled('/a/foo.c', [1, '.c'] as unknown as string[]), true);
+    });
+
+    test('entryOf finds an entry again in text that changed', () => {
+        assert.deepStrictEqual(entryOf('new\n\nA\n', 'A'), { from: 5, to: 6 });
+    });
+
+    test('entryOf refuses an entry that is gone', () => {
+        assert.throws(() => entryOf('new\n', 'A'));
     });
 
     test('quoteAt keeps a selection, trims the current line, and gives an empty quote on a blank line', () => {
@@ -79,6 +92,12 @@ suite('sidecar edits and selection', () => {
         assert.strictEqual(acceptEdit(parsed, placeCards(parsed, 'a')[0], 'a').insert, '');
     });
 
+    test('acceptEdit refuses a replacement that holds the marker', () => {
+        const parsed = parse('{line="1"~~v = "~> 3.0"~>v = "~> 4.0"~~}', true);
+        const source = 'v = "~> 3.0"';
+        assert.throws(() => acceptEdit(parsed, placeCards(parsed, source)[0], source));
+    });
+
     test('acceptEdit refuses orphaned and ambiguous cards', () => {
         const repeated = parse('{line="2"~~x~>y~~}', true);
         assert.throws(() => acceptEdit(repeated, placeCards(repeated, 'x\nq\nx')[0], 'x\nq\nx'));
@@ -137,10 +156,10 @@ suite('findQuote', () => {
 });
 
 suite('placeCards', () => {
-    test('moves a card to the source and keeps its sidecar range in entry', () => {
+    test('moves a card to the source and keeps its sidecar text in raw', () => {
         const text = '{line="2"==b==}{author="a" date="d">>x<<}';
         const [card] = placeCards(parse(text, true), 'a\nb\n');
-        assert.deepStrictEqual([card.from, card.to, card.entry], [2, 3, { from: 0, to: text.length }]);
+        assert.deepStrictEqual([card.from, card.to, card.raw], [2, 3, text]);
     });
 
     test('marks a missing quote and a bare addition as orphaned', () => {

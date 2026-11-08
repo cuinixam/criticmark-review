@@ -4,10 +4,10 @@ import { Parsed } from './parse';
 
 export function sidecarEnabled(fileName: string, extensions: readonly string[]): boolean {
     const name = fileName.toLowerCase();
-    if (name.endsWith('.review')) {
+    if (name.endsWith('.review') || !Array.isArray(extensions)) {
         return false;
     }
-    return extensions.some(e => e === '*' || name.endsWith(e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
+    return extensions.filter(e => typeof e === 'string').some(e => e === '*' || name.endsWith(e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
 }
 
 // What a new comment quotes: the selection, or the current line without its indentation. A blank line quotes nothing.
@@ -61,6 +61,10 @@ export function acceptEdit(parsed: Parsed, card: Card, source: string): TextEdit
         throw new Error('This code appears more than once and none of the copies is on the line the suggestion names.');
     }
     const node = parsed.nodes[card.suggestion!];
+    // The first `~>` splits old from new, so a quote holding one is cut in the wrong place.
+    if (node.kind === 'substitution' && node.text.includes('~>')) {
+        throw new Error('This replacement contains "~>", so its old and new text cannot be told apart. Apply it by hand.');
+    }
     const insert = node.kind === 'substitution' ? node.text.replace(/\r?\n/g, source.includes('\r\n') ? '\r\n' : '\n') : '';
     return { from: card.from, to: card.to, insert, expected: source.slice(card.from, card.to) };
 }
@@ -87,18 +91,26 @@ export function findQuote(source: string, quote: string, line: number | null): {
 // Sidecar cards share the inline `Card`, so reply, edit and resolve keep using the thread indexes into the sidecar.
 export function placeCards(parsed: Parsed, source: string): Card[] {
     return cards(parsed).map((card): Card => {
-        const entry = { from: card.from, to: card.to };
         const anchor = card.thread !== null ? parsed.threads[card.thread].anchorIndex : card.suggestion;
         if (anchor === null) {
-            return { ...card, entry, from: 0, to: 0 };
+            return { ...card, from: 0, to: 0 };
         }
         const node = parsed.nodes[anchor];
         // A bare addition has no source text to attach to.
         const quote = node.kind === 'substitution' ? node.oldText! : node.kind === 'addition' ? '' : node.text;
         const match = findQuote(source, quote, node.line);
         if (!match) {
-            return { ...card, entry, from: 0, to: 0, orphaned: true, anchor: `Orphaned: ${card.anchor}` };
+            return { ...card, from: 0, to: 0, orphaned: true, anchor: `Orphaned: ${card.anchor}` };
         }
-        return { ...card, entry, from: match.from, to: match.to, ambiguous: match.count > 1 && !match.onLine };
+        return { ...card, from: match.from, to: match.to, ambiguous: match.count > 1 && !match.onLine };
     }).sort((a, b) => a.from - b.from);
+}
+
+// Finds an entry by its text, because offsets go stale when an agent writes to the sidecar during a save.
+export function entryOf(text: string, raw: string): { from: number; to: number } {
+    const from = text.indexOf(raw);
+    if (from === -1) {
+        throw new Error('The review file changed and this entry is no longer in it.');
+    }
+    return { from, to: from + raw.length };
 }

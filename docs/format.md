@@ -103,6 +103,7 @@ The elements, attributes, threads, replies and resolved state are the ones descr
 - Do not write a bare `{++text++}`, because it has nothing in the source to attach to. To add code, write a replacement of the neighbouring line.
 - `{=+text+=}` is not used.
 - Nothing counts as code: markup-like text inside backticks or fences is read as it is in a normal element.
+- A quote cannot hold the closing marker of its own element (`==}`, `--}`, `~~}`) or `~>`. When the code contains one, quote less of it.
 - Add new entries at the end of the file.
 - To accept or reject by hand, change the source if accepting, then remove the entry and its blank line. When the last entry is gone, delete the file.
 
