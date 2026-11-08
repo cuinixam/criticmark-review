@@ -21,6 +21,21 @@ Review CriticMarkup comments and suggestions in markdown files from a side panel
 
 The extension saves the file after each change, so an agent reading the file on disk sees your comments at once.
 
+## Reviewing other files
+
+Code files cannot hold CriticMarkup without breaking their syntax, so the review of any other text file lives in a sidecar file next to it: `foo.c.review` for `foo.c`. You review the same way, from the same panel, and never open the sidecar. An agent reads it and replies in it. Markdown is always reviewed inline.
+
+With no selection, a new comment quotes the current line. On a blank line it applies to the whole file. Unlike in markdown, you can comment anywhere, including on code that already has a comment.
+
+The differences from markdown:
+
+- Your file only changes when you press **Accept**. Until then the new text of a replacement is drawn by the editor after the old text, and only its first line. The full text is on the card.
+- A thread finds its place by searching for the code it quotes. If that code is rewritten or reformatted, the card shows **Orphaned** and has no highlight. **Accept** is refused for it.
+- **Accept** is also refused when the same code appears several times and none of the copies is on the line the suggestion names.
+- `Cmd+Z` does not reach the sidecar, as with a pull request review. Comments can be edited or deleted and threads reopened, but a delete is final. After **Accept**, undo in the file restores the code and the suggestion stays gone.
+
+Sidecar files are normal files in your repository. Do not add them to `.gitignore`, because that would hide open review comments, and remove them before you push. Agent replies appear at once for files in your workspace; for a file outside it, switch back to its editor.
+
 ## Install
 
 The extension is not on the Marketplace. Download the `.vsix` file from the latest [GitHub release](https://github.com/cuinixam/criticmark-review/releases) and install it:
@@ -46,6 +61,7 @@ Every push to `main` runs the tests and then [semantic-release](https://semantic
 ## Settings
 
 - `criticmarkReview.author`: the name written into new comments and replies. When empty, your system user name is used, or `User` if there is none.
+- `criticmarkReview.sidecarExtensions`: the file extensions reviewed with a sidecar file, such as `[".c", ".py"]`. The default `["*"]` means all files, and `[]` means markdown only. Markdown is always reviewed inline.
 - Colours: change `criticmarkReview.highlightBackground` (highlighted text) and `criticmarkReview.resolvedBackground` (resolved cards) under `workbench.colorCustomizations`.
 
 ## For AI agents
