@@ -10,6 +10,8 @@
 
 ### Open
 
+- [CMR-002 — Escape CriticMarkup markers in sidecar quotes](cmr-002.md)
+
 ### In Progress
 
 - [CMR-001 — Review files that are not markdown with a sidecar file](cmr-001.md)
