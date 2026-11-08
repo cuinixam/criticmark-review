@@ -66,6 +66,16 @@ suite('Sidecar review', () => {
         assert.match(fs.readFileSync(sidecar, 'utf8'), /^\{line="2" before="[0-9a-f]+" after="[0-9a-f]+" author=/);
     });
 
+    test('clicking a card puts its code at the top of the editor', async () => {
+        const source = `${'// filler\n'.repeat(300)}int target;\n${'// filler\n'.repeat(300)}`;
+        const { api, editor } = await open(source, '{line="301"==int target;==}{author="a" date="d">>c<<}\n');
+        await until(() => api.cards().length === 1);
+        await api.handle({ type: 'reveal', id: api.cards()[0].id });
+        await new Promise(r => setTimeout(r, 1000));
+        // VS Code keeps a few lines of context above the revealed code.
+        assert.ok(Math.abs(editor.visibleRanges[0].start.line - 295) <= 2, `first visible line: ${editor.visibleRanges[0].start.line}`);
+    });
+
     test('a reply goes to the sidecar and leaves the source alone', async () => {
         const { api, file, sidecar } = await open(SOURCE, REVIEW);
         await until(() => api.cards().length === 1);

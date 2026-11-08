@@ -10,6 +10,8 @@
     let editing = null;
     // Comment whose "…" menu is open: { id, position }, with position -1 for the card's own menu.
     let menu = null;
+    // The card last clicked, or the one the editor's cursor last moved into.
+    let selectedId = null;
     // Text typed in every box, by file and box, so it survives re-renders and switching files.
     const typed = new Map();
     // The box whose text was last sent, cleared once the extension confirms the write.
@@ -233,10 +235,11 @@
 
     function cardView(card) {
         const open = isOpen(card);
-        const box = el('div', 'card' + (card.resolved ? ' resolved' : ''));
+        const box = el('div', 'card' + (card.resolved ? ' resolved' : '') + (card.id === selectedId ? ' selected' : ''));
         box.dataset.id = card.id;
         const pill = card.resolved ? 'Resolved' : card.suggestion !== null ? 'Suggestion' : '';
         const head = header(card.anchor || 'Comment', open, pill, () => {
+            selectedId = card.id;
             setOpen(card, !open);
             remember();
             draw();
@@ -367,9 +370,13 @@
             draw();
         } else if (message.type === 'select' || message.type === 'focus') {
             const card = state.cards.find(c => c.id === message.id);
+            const changed = selectedId !== message.id;
+            selectedId = message.id;
             if (card && !isOpen(card)) {
                 setOpen(card, true);
                 remember();
+                draw();
+            } else if (changed) {
                 draw();
             }
             const node = cardNode(message.id);
