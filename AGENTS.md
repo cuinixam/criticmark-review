@@ -18,7 +18,7 @@ This file provides guidance to coding agents working in this repository.
 
 ## Architecture
 
-- [src/markup/](src/markup/): pure CriticMarkup logic, no `vscode` import. `parse.ts` turns text into nodes and threads; `edits.ts` builds text edits for add, reply, delete, accept and reject. Every edit carries the text it replaces (`expected`), so a stale edit is refused instead of landing at a wrong offset.
+- [src/markup/](src/markup/): pure CriticMarkup logic, no `vscode` import. `parse.ts` turns text into nodes and threads; `edits.ts` builds text edits for add, reply, delete, accept and reject. Every edit carries the text it replaces (`expected`), so a stale edit is refused instead of landing at a wrong offset. `sidecar.ts` places the entries of a `.review` file on its source and builds their edits.
 - [src/ui/](src/ui/): VS Code adapters. `ThreadManager` owns the comment controller and rebuilds threads after each change, reusing a thread whose text did not change so an open reply box survives. `Decorations` colours suggestions and highlights.
 - [src/extension.ts](src/extension.ts): `activate()`, the document listeners (debounced 200 ms) and all command handlers.
 

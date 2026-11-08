@@ -2,7 +2,7 @@
 
 This page is for AI agents and anyone who edits review markup without the extension. It describes the exact syntax the extension reads and writes. The Obsidian Track Changes plugin uses the same syntax, so a file works in both editors.
 
-The review lives in the markdown file itself. There is no sidecar file and no database.
+The review of a markdown file lives in the file itself. A file that is not markdown keeps its review in a sidecar file, see [Sidecar files](#sidecar-files). There is no database.
 
 ## Elements
 
@@ -74,6 +74,37 @@ Remove the markup and any comment thread attached to the suggestion. The extensi
 Markup inside code is plain text: fenced code blocks (lines starting with three backticks or three tildes), indented code blocks (lines indented by four spaces or a tab after a blank line), and inline code. That is why the examples on this page are not threads.
 
 An element that starts inside another element is ignored.
+
+## Sidecar files
+
+Inline markup would break the syntax of a code file, so the review of `foo.c` lives next to it in `foo.c.review`. When you read a file that is not markdown, check for its `.review` file. Reply in that file and do not put markup into the source.
+
+The file is a list of entries separated by blank lines:
+
+```text
+{line="42"==static int x;==}{author="Max" date="2026-11-08">>Why static?<<}{author="Claude" date="2026-11-08">>Only used in this file.<<}
+
+{line="57"==if (x > 3) {
+    reset();
+}==}{author="Max" date="2026-11-08" status="resolved">>Is 3 the right limit?<<}
+
+{line="80"~~return 0;~>return ERR_TIMEOUT;~~}{author="Claude" date="2026-11-08">>The caller expects an error here.<<}
+
+{line="95"--debug_dump();--}
+
+{author="Max" date="2026-11-08">>General comment about the whole file.<<}
+```
+
+The elements, attributes, threads, replies and resolved state are the ones described above, with these differences:
+
+- The quoted text in a highlight, a deletion or the old part of a replacement is the anchor: the exact text of the source. It may span lines. To remove a whole line, include its line break in the quote.
+- `line="N"` is required on every anchor and is the first line of the quote in the source. It is only used to tell repeated text apart.
+- A comment with no anchor applies to the whole file.
+- Do not write a bare `{++text++}`, because it has nothing in the source to attach to. To add code, write a replacement of the neighbouring line.
+- `{=+text+=}` is not used.
+- Nothing counts as code: markup-like text inside backticks or fences is read as it is in a normal element.
+- Add new entries at the end of the file.
+- To accept or reject by hand, change the source if accepting, then remove the entry and its blank line. When the last entry is gone, delete the file.
 
 ## Checking that no markup is left
 
