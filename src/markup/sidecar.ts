@@ -1,5 +1,69 @@
 import { Card, cards } from './cards';
+import { TextEdit, commentMarkup } from './edits';
 import { Parsed } from './parse';
+
+export function sidecarEnabled(fileName: string, extensions: readonly string[]): boolean {
+    const name = fileName.toLowerCase();
+    if (name.endsWith('.review')) {
+        return false;
+    }
+    return extensions.some(e => e === '*' || name.endsWith(e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
+}
+
+// What a new comment quotes: the selection, or the current line without its indentation. A blank line quotes nothing.
+export function quoteAt(source: string, from: number, to: number): { from: number; to: number; quote: string } {
+    if (from !== to) {
+        return { from, to, quote: source.slice(from, to) };
+    }
+    const start = source.lastIndexOf('\n', from - 1) + 1;
+    const newline = source.indexOf('\n', from);
+    const line = source.slice(start, newline === -1 ? source.length : newline);
+    const quote = line.trim();
+    if (!quote) {
+        return { from: 0, to: 0, quote: '' };
+    }
+    const lineFrom = start + line.length - line.trimStart().length;
+    return { from: lineFrom, to: lineFrom + quote.length, quote };
+}
+
+// Anchors can overlap in a sidecar. A cursor opens the smallest one around it; a selection opens only an anchor it equals.
+export function cardAt(shown: Card[], from: number, to: number): Card | undefined {
+    if (from !== to) {
+        return shown.find(c => c.from === from && c.to === to);
+    }
+    return shown.filter(c => c.from < from && from < c.to).sort((a, b) => (a.to - a.from) - (b.to - b.from))[0];
+}
+
+export function addEntry(text: string, quote: string, line: number | null, body: string, author: string, date: string): TextEdit {
+    if (quote.includes('==}')) {
+        throw new Error('Selection contains "==}", which would break the mark.');
+    }
+    const anchor = quote ? `{line="${line}"==${quote.replace(/\r\n/g, '\n')}==}` : '';
+    const separator = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n';
+    return { from: text.length, to: text.length, insert: `${separator}${anchor}${commentMarkup(body, author, date)}\n`, expected: '' };
+}
+
+export function removeEntry(text: string, entry: { from: number; to: number }): TextEdit {
+    let from = entry.from;
+    const to = entry.to + text.slice(entry.to).match(/^(\r?\n)*/)![0].length;
+    if (to === text.length && from > 0) {
+        from = Math.min(from, text.slice(0, from).trimEnd().length + 1);
+    }
+    return { from, to, insert: '', expected: text.slice(from, to) };
+}
+
+// The edit to the source that an Accept makes. Refused whenever the place in the source would be a guess.
+export function acceptEdit(parsed: Parsed, card: Card, source: string): TextEdit {
+    if (card.orphaned) {
+        throw new Error('The code of this suggestion is no longer in the file.');
+    }
+    if (card.ambiguous) {
+        throw new Error('This code appears more than once and none of the copies is on the line the suggestion names.');
+    }
+    const node = parsed.nodes[card.suggestion!];
+    const insert = node.kind === 'substitution' ? node.text.replace(/\r?\n/g, source.includes('\r\n') ? '\r\n' : '\n') : '';
+    return { from: card.from, to: card.to, insert, expected: source.slice(card.from, card.to) };
+}
 
 function lineOf(text: string, pos: number): number {
     return text.slice(0, pos).split('\n').length;
