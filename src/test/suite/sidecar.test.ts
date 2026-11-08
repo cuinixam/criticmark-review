@@ -9,6 +9,7 @@ import { PanelMessage } from '../../ui/ReviewPanel';
 interface Api {
     handle: (message: PanelMessage) => Promise<boolean>;
     cards: () => Card[];
+    marked: () => string | undefined;
 }
 
 const FIXTURES = path.join(__dirname, '../../../src/test/fixtures');
@@ -74,6 +75,19 @@ suite('Sidecar review', () => {
         await new Promise(r => setTimeout(r, 1000));
         // VS Code keeps a few lines of context above the revealed code.
         assert.ok(Math.abs(editor.visibleRanges[0].start.line - 295) <= 2, `first visible line: ${editor.visibleRanges[0].start.line}`);
+    });
+
+    test('the mark follows the selected comment and stays when the cursor leaves', async () => {
+        const review = '{line="1"==static int x;==}{author="a" date="d">>one<<}\n\n{line="3"==int first==}{author="a" date="d">>two<<}\n';
+        const { api, editor } = await open(SOURCE, review);
+        await until(() => api.cards().length === 2);
+        await api.handle({ type: 'reveal', id: api.cards()[0].id });
+        await until(() => api.marked() === api.cards()[0].id);
+        editor.selection = new vscode.Selection(2, 2, 2, 2);
+        await until(() => api.marked() === api.cards()[1].id);
+        editor.selection = new vscode.Selection(1, 0, 1, 0);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        assert.strictEqual(api.marked(), api.cards()[1].id);
     });
 
     test('a reply goes to the sidecar and leaves the source alone', async () => {

@@ -51,8 +51,8 @@ interface Draft {
     selected: string;
 }
 
-export function activate(context: vscode.ExtensionContext): { handle: (message: PanelMessage) => Promise<boolean>; cards: () => Card[] } {
-    const decorations = new Decorations();
+export function activate(context: vscode.ExtensionContext): { handle: (message: PanelMessage) => Promise<boolean>; cards: () => Card[]; marked: () => string | undefined } {
+    const decorations = new Decorations(context.extensionUri);
     const timers = new Map<string, NodeJS.Timeout>();
     // The text of each open file's sidecar, as last read from disk. Empty when it has none.
     const sidecars = new Map<string, string>();
@@ -61,6 +61,8 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
     let shown: Card[] = [];
     let draft: Draft | undefined;
     let selected: string | undefined;
+    // The card with the mark beside its first line. Unlike `selected`, it stays when the cursor leaves the card.
+    let marked: string | undefined;
     // Set while an edit runs, so a double click cannot write the same reply twice.
     let busy = false;
     let hideResolved = context.globalState.get('hideResolved', false);
@@ -129,6 +131,14 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
         return shown.find(c => from === to ? c.from < from && from < c.to : c.from < to && from < c.to);
     };
 
+    const drawMark = () => {
+        const card = shown.find(c => c.id === marked);
+        for (const editor of vscode.window.visibleTextEditors.filter(e => e.document === current)) {
+            // Whole-file and orphaned cards are at 0, 0 and have no line to mark.
+            decorations.mark(editor, card && (card.from || card.to) ? editor.document.positionAt(card.from) : undefined);
+        }
+    };
+
     // Switches the editor context menu between Add Comment and the actions for the markup under the cursor.
     const updateCursorContext = () => {
         const card = cardAtCursor();
@@ -138,6 +148,8 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
             panel.select(card.id);
         }
         selected = card?.id;
+        marked = card?.id ?? marked;
+        drawMark();
     };
 
     const render = () => {
@@ -539,7 +551,7 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
     vscode.window.visibleTextEditors.forEach(showReview);
     setCurrent(vscode.window.activeTextEditor);
     // The integration tests drive the panel through these.
-    return { handle, cards: () => shown };
+    return { handle, cards: () => shown, marked: () => marked };
 }
 
 export function deactivate(): void {}
