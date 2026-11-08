@@ -28,7 +28,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:markdown"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -39,6 +39,16 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Name written into `author=\"…\"` of new comments and replies. When empty, your system user name is used, or `User` if there is none."
+        },
+        "criticmarkReview.sidecarExtensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ],
+          "markdownDescription": "File extensions reviewed with a `.review` sidecar file, such as `.c`. `*` means all files. An empty list means markdown only. Markdown is always reviewed inline."
         }
       }
     },
@@ -142,32 +152,32 @@
       "editor/context": [
         {
           "command": "criticmarkReview.addComment",
-          "when": "editorLangId == markdown && !criticmarkReview.at",
+          "when": "criticmarkReview.active && !criticmarkReview.at",
           "group": "criticmark@1"
         },
         {
           "command": "criticmarkReview.openReply",
-          "when": "editorLangId == markdown && criticmarkReview.at == thread",
+          "when": "criticmarkReview.active && criticmarkReview.at == thread",
           "group": "criticmark@1"
         },
         {
           "command": "criticmarkReview.deleteThread",
-          "when": "editorLangId == markdown && criticmarkReview.at == thread",
+          "when": "criticmarkReview.active && criticmarkReview.at == thread",
           "group": "criticmark@2"
         },
         {
           "command": "criticmarkReview.commentSuggestion",
-          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "when": "criticmarkReview.active && criticmarkReview.at == suggestion",
           "group": "criticmark@1"
         },
         {
           "command": "criticmarkReview.accept",
-          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "when": "criticmarkReview.active && criticmarkReview.at == suggestion",
           "group": "criticmark@2"
         },
         {
           "command": "criticmarkReview.reject",
-          "when": "editorLangId == markdown && criticmarkReview.at == suggestion",
+          "when": "criticmarkReview.active && criticmarkReview.at == suggestion",
           "group": "criticmark@3"
         }
       ],
@@ -237,19 +247,19 @@
         "command": "criticmarkReview.addComment",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
-        "when": "editorTextFocus && editorLangId == markdown && !criticmarkReview.at"
+        "when": "editorTextFocus && criticmarkReview.active && !criticmarkReview.at"
       },
       {
         "command": "criticmarkReview.openReply",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
-        "when": "editorTextFocus && editorLangId == markdown && criticmarkReview.at == thread"
+        "when": "editorTextFocus && criticmarkReview.active && criticmarkReview.at == thread"
       },
       {
         "command": "criticmarkReview.commentSuggestion",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
-        "when": "editorTextFocus && editorLangId == markdown && criticmarkReview.at == suggestion"
+        "when": "editorTextFocus && criticmarkReview.active && criticmarkReview.at == suggestion"
       }
     ]
   },

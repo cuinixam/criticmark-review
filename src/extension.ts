@@ -5,6 +5,7 @@ import {
     TextEdit, addComment, checkSelection, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
 } from './markup/edits';
 import { parse } from './markup/parse';
+import { cardAt, placeCards, sidecarEnabled } from './markup/sidecar';
 import { Decorations } from './ui/Decorations';
 import { PanelMessage, ReviewPanel, VIEW_ID } from './ui/ReviewPanel';
 
@@ -29,6 +30,19 @@ function author(): string {
     }
 }
 
+function usesSidecar(document: vscode.TextDocument): boolean {
+    const extensions = vscode.workspace.getConfiguration('criticmarkReview').get<string[]>('sidecarExtensions', ['*']);
+    return document.uri.scheme === 'file' && document.languageId !== 'markdown' && sidecarEnabled(document.fileName, extensions);
+}
+
+function reviewable(document: vscode.TextDocument): boolean {
+    return document.languageId === 'markdown' || usesSidecar(document);
+}
+
+function sidecarUri(document: vscode.TextDocument): vscode.Uri {
+    return document.uri.with({ path: `${document.uri.path}.review` });
+}
+
 // A comment being written in the panel for a selection. It reaches the file only on submit.
 interface Draft {
     uri: string;
@@ -37,10 +51,12 @@ interface Draft {
     selected: string;
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext): { handle: (message: PanelMessage) => Promise<boolean>; cards: () => Card[] } {
     const decorations = new Decorations();
     const timers = new Map<string, NodeJS.Timeout>();
-    // The markdown file the panel shows, and its cards as last drawn.
+    // The text of each open file's sidecar, as last read from disk. Empty when it has none.
+    const sidecars = new Map<string, string>();
+    // The file the panel shows, and its cards as last drawn.
     let current: vscode.TextDocument | undefined;
     let shown: Card[] = [];
     let draft: Draft | undefined;
@@ -50,14 +66,36 @@ export function activate(context: vscode.ExtensionContext): void {
     let hideResolved = context.globalState.get('hideResolved', false);
     vscode.commands.executeCommand('setContext', 'criticmarkReview.hideResolved', hideResolved);
 
-    const decorate = (document: vscode.TextDocument) => {
-        const parsed = parse(document.getText());
+    const sidecarText = (document: vscode.TextDocument) => sidecars.get(document.uri.toString()) ?? '';
+
+    // Returns false when the sidecar exists but cannot be read, so nothing overwrites it.
+    const loadSidecar = async (document: vscode.TextDocument): Promise<boolean> => {
+        try {
+            sidecars.set(document.uri.toString(), new TextDecoder().decode(await vscode.workspace.fs.readFile(sidecarUri(document))));
+        } catch (e) {
+            if (!(e instanceof vscode.FileSystemError && e.code === 'FileNotFound')) {
+                vscode.window.showErrorMessage(`Cannot read the review file: ${(e as Error).message}`);
+                return false;
+            }
+            sidecars.set(document.uri.toString(), '');
+        }
+        return true;
+    };
+
+    const decorate = (document: vscode.TextDocument): Card[] => {
+        const sidecar = usesSidecar(document);
+        const parsed = sidecar ? parse(sidecarText(document), true) : parse(document.getText());
+        const placed = sidecar ? placeCards(parsed, document.getText()) : cards(parsed);
         for (const editor of vscode.window.visibleTextEditors) {
             if (editor.document === document) {
-                decorations.apply(editor, parsed);
+                if (sidecar) {
+                    decorations.applyCards(editor, parsed, placed);
+                } else {
+                    decorations.apply(editor, parsed);
+                }
             }
         }
-        return parsed;
+        return placed;
     };
 
     // Keeps the draft on its text while the file changes above it; drops it when its text itself changes.
@@ -85,6 +123,9 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         const from = current.offsetAt(editor.selection.start);
         const to = current.offsetAt(editor.selection.end);
+        if (usesSidecar(current)) {
+            return cardAt(shown, from, to);
+        }
         return shown.find(c => from === to ? c.from < from && from < c.to : c.from < to && from < c.to);
     };
 
@@ -100,7 +141,8 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     const render = () => {
-        shown = current ? cards(decorate(current)) : [];
+        vscode.commands.executeCommand('setContext', 'criticmarkReview.active', current !== undefined);
+        shown = current ? decorate(current) : [];
         const showDraft = draft && current && draft.uri === current.uri.toString();
         panel.render({
             file: current ? current.uri.toString() : null,
@@ -111,10 +153,23 @@ export function activate(context: vscode.ExtensionContext): void {
         updateCursorContext();
     };
 
+    const refresh = async (document: vscode.TextDocument) => {
+        if (await loadSidecar(document)) {
+            if (document === current) {
+                render();
+            } else {
+                decorate(document);
+            }
+        }
+    };
+
     const setCurrent = (editor: vscode.TextEditor | undefined) => {
         if (editor) {
-            current = editor.document.languageId === 'markdown' ? editor.document : undefined;
+            current = reviewable(editor.document) ? editor.document : undefined;
             render();
+            if (current && usesSidecar(current)) {
+                void refresh(current);
+            }
         }
     };
 
@@ -168,6 +223,9 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         const editor = vscode.window.visibleTextEditors.find(e => e.document === current)
             ?? await vscode.window.showTextDocument(current, { preserveFocus: true });
+        if (card.from === card.to) {
+            return;
+        }
         const range = new vscode.Range(current.positionAt(card.from), current.positionAt(card.to));
         editor.selection = new vscode.Selection(range.start, range.end);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
@@ -307,13 +365,31 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     };
 
+    const showReview = (editor: vscode.TextEditor) => {
+        if (usesSidecar(editor.document)) {
+            void refresh(editor.document);
+        } else if (reviewable(editor.document)) {
+            decorate(editor.document);
+        }
+    };
+
+    // Agent replies land in the sidecar, which no editor has open, so its changes are only visible on disk.
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.review');
+    const onSidecarChange = (uri: vscode.Uri) => {
+        const source = uri.path.slice(0, -'.review'.length);
+        const document = vscode.workspace.textDocuments.find(d => d.uri.scheme === 'file' && d.uri.path === source);
+        if (document && usesSidecar(document)) {
+            void refresh(document);
+        }
+    };
+
     context.subscriptions.push(
         decorations,
         vscode.window.registerWebviewViewProvider(VIEW_ID, panel, { webviewOptions: { retainContextWhenHidden: true } }),
         vscode.window.onDidChangeActiveTextEditor(setCurrent),
         vscode.window.onDidChangeTextEditorSelection(updateCursorContext),
         vscode.workspace.onDidChangeTextDocument(e => {
-            if (e.document.languageId !== 'markdown') {
+            if (!reviewable(e.document)) {
                 return;
             }
             const key = e.document.uri.toString();
@@ -327,18 +403,33 @@ export function activate(context: vscode.ExtensionContext): void {
             if (draft?.uri === document.uri.toString()) {
                 draft = undefined;
             }
+            sidecars.delete(document.uri.toString());
             if (document === current) {
                 current = undefined;
                 render();
             }
         }),
         vscode.window.onDidChangeVisibleTextEditors(editors => {
-            editors.filter(e => e.document.languageId === 'markdown').forEach(e => decorations.apply(e, parse(e.document.getText())));
+            editors.forEach(showReview);
+        }),
+        watcher,
+        ...[watcher.onDidCreate, watcher.onDidChange, watcher.onDidDelete].map(event => event(onSidecarChange)),
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('criticmarkReview.sidecarExtensions')) {
+                vscode.window.visibleTextEditors.forEach(editor => {
+                    if (reviewable(editor.document)) {
+                        showReview(editor);
+                    } else {
+                        decorations.applyCards(editor, parse('', true), []);
+                    }
+                });
+                setCurrent(vscode.window.activeTextEditor);
+            }
         }),
 
         vscode.commands.registerCommand('criticmarkReview.addComment', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (!editor || editor.document.languageId !== 'markdown') {
+            if (!editor || !reviewable(editor.document)) {
                 return;
             }
             const document = editor.document;
@@ -376,8 +467,10 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('criticmarkReview.reject', atCursor('reject')),
     );
 
-    vscode.window.visibleTextEditors.filter(e => e.document.languageId === 'markdown').forEach(e => decorate(e.document));
+    vscode.window.visibleTextEditors.forEach(showReview);
     setCurrent(vscode.window.activeTextEditor);
+    // The integration tests drive the panel through these.
+    return { handle, cards: () => shown };
 }
 
 export function deactivate(): void {}

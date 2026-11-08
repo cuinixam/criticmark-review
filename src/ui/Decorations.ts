@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { Card } from '../markup/cards';
 import { Parsed } from '../markup/parse';
 
 // Closing markers (`++}`, `--}`, `==}`, `+=}`, `~~}`) are three characters long.
@@ -68,6 +69,42 @@ export class Decorations implements vscode.Disposable {
         editor.setDecorations(this.removed, removed);
         editor.setDecorations(this.highlight, highlight);
         editor.setDecorations(this.aitext, aitext);
+        editor.setDecorations(this.resolved, resolved);
+    }
+
+    // A sidecar's markup is not in this editor, so its cards say where to draw. The new text of a replacement can only be drawn.
+    applyCards(editor: vscode.TextEditor, parsed: Parsed, cards: Card[]): void {
+        const doc = editor.document;
+        const highlight: vscode.Range[] = [];
+        const resolved: vscode.Range[] = [];
+        const removed: vscode.DecorationOptions[] = [];
+        for (const card of cards.filter(c => c.from !== c.to)) {
+            const range = new vscode.Range(doc.positionAt(card.from), doc.positionAt(card.to));
+            if (card.suggestion === null) {
+                (card.resolved ? resolved : highlight).push(range);
+                continue;
+            }
+            const node = parsed.nodes[card.suggestion];
+            if (node.kind !== 'substitution') {
+                removed.push({ range });
+                continue;
+            }
+            const lines = node.text.split(/\r?\n/);
+            removed.push({
+                range,
+                renderOptions: {
+                    after: {
+                        contentText: lines.length > 1 ? `${lines[0]} …` : lines[0],
+                        backgroundColor: new vscode.ThemeColor('diffEditor.insertedTextBackground'),
+                        textDecoration: 'none',
+                    },
+                },
+            });
+        }
+        editor.setDecorations(this.inserted, []);
+        editor.setDecorations(this.removed, removed);
+        editor.setDecorations(this.highlight, highlight);
+        editor.setDecorations(this.aitext, []);
         editor.setDecorations(this.resolved, resolved);
     }
 
