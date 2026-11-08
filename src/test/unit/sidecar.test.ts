@@ -1,6 +1,91 @@
 import * as assert from 'assert';
+import { Card } from '../../markup/cards';
+import { TextEdit } from '../../markup/edits';
 import { parse } from '../../markup/parse';
-import { findQuote, placeCards } from '../../markup/sidecar';
+import { acceptEdit, addEntry, cardAt, findQuote, placeCards, quoteAt, removeEntry, sidecarEnabled } from '../../markup/sidecar';
+
+function apply(text: string, edit: TextEdit): string {
+    return text.slice(0, edit.from) + edit.insert + text.slice(edit.to);
+}
+
+suite('sidecar edits and selection', () => {
+    test('sidecarEnabled', () => {
+        assert.strictEqual(sidecarEnabled('/a/foo.c', ['*']), true);
+        assert.strictEqual(sidecarEnabled('/a/foo.c', []), false);
+        assert.strictEqual(sidecarEnabled('/a/foo.PY', ['.py']), true);
+        assert.strictEqual(sidecarEnabled('/a/foo.py', ['py']), true);
+        assert.strictEqual(sidecarEnabled('/a/foo.c', ['.py']), false);
+        assert.strictEqual(sidecarEnabled('/a/foo.c.review', ['*']), false);
+    });
+
+    test('quoteAt keeps a selection, trims the current line, and gives an empty quote on a blank line', () => {
+        assert.deepStrictEqual(quoteAt('  ab\n', 2, 3), { from: 2, to: 3, quote: 'a' });
+        assert.deepStrictEqual(quoteAt('  ab\n', 3, 3), { from: 2, to: 4, quote: 'ab' });
+        assert.deepStrictEqual(quoteAt('a\n\nb', 2, 2), { from: 0, to: 0, quote: '' });
+    });
+
+    test('quoteAt leaves a CRLF line ending out of the quote', () => {
+        assert.deepStrictEqual(quoteAt('ab\r\ncd', 1, 1), { from: 0, to: 2, quote: 'ab' });
+    });
+
+    test('cardAt: a cursor takes the smallest card, a different selection takes none', () => {
+        const big = { from: 0, to: 10 } as Card;
+        const small = { from: 2, to: 5 } as Card;
+        assert.strictEqual(cardAt([big, small], 3, 3), small);
+        assert.strictEqual(cardAt([big, small], 2, 5), small);
+        assert.strictEqual(cardAt([big, small], 1, 3), undefined);
+    });
+
+    test('addEntry appends after a blank line and writes line', () => {
+        const edit = addEntry('old', 'x', 7, 'c', 'a', 'd');
+        assert.strictEqual(edit.insert, '\n\n{line="7"==x==}{author="a" date="d">>c<<}\n');
+    });
+
+    test('addEntry writes a quote with LF line endings', () => {
+        assert.strictEqual(addEntry('', 'x\r\ny', 1, 'c', 'a', 'd').insert, '{line="1"==x\ny==}{author="a" date="d">>c<<}\n');
+    });
+
+    test('addEntry with no quote writes a whole-file comment', () => {
+        assert.strictEqual(addEntry('', '', null, 'c', 'a', 'd').insert, '{author="a" date="d">>c<<}\n');
+    });
+
+    test('addEntry refuses a quote holding ==}', () => {
+        assert.throws(() => addEntry('', 'a==}', 1, 'c', 'a', 'd'));
+    });
+
+    test('removeEntry also removes the blank line that separates it', () => {
+        const text = 'A\n\nB\n\nC\n';
+        assert.strictEqual(apply(text, removeEntry(text, { from: 3, to: 4 })), 'A\n\nC\n');
+    });
+
+    test('removeEntry of the last entry leaves one line ending', () => {
+        const text = 'A\n\nB\n';
+        assert.strictEqual(apply(text, removeEntry(text, { from: 3, to: 4 })), 'A\n');
+    });
+
+    test('removeEntry of the only entry leaves nothing', () => {
+        const text = 'A\n';
+        assert.strictEqual(apply(text, removeEntry(text, { from: 0, to: 1 })), '');
+    });
+
+    test('acceptEdit replaces the anchor and writes the line endings of the source', () => {
+        const parsed = parse('{line="1"~~a\nb~>c\nd~~}', true);
+        const source = 'a\r\nb';
+        assert.strictEqual(acceptEdit(parsed, placeCards(parsed, source)[0], source).insert, 'c\r\nd');
+    });
+
+    test('acceptEdit on a deletion inserts nothing', () => {
+        const parsed = parse('{line="1"--a--}', true);
+        assert.strictEqual(acceptEdit(parsed, placeCards(parsed, 'a')[0], 'a').insert, '');
+    });
+
+    test('acceptEdit refuses orphaned and ambiguous cards', () => {
+        const repeated = parse('{line="2"~~x~>y~~}', true);
+        assert.throws(() => acceptEdit(repeated, placeCards(repeated, 'x\nq\nx')[0], 'x\nq\nx'));
+        const gone = parse('{line="1"~~x~>y~~}', true);
+        assert.throws(() => acceptEdit(gone, placeCards(gone, 'q')[0], 'q'));
+    });
+});
 
 suite('sidecar parsing', () => {
     test('a quote holding markup-like text does not swallow the next entry', () => {
