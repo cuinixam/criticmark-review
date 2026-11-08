@@ -14,9 +14,9 @@
 
 ### In Progress
 
-- [CMR-001 — Review files that are not markdown with a sidecar file](cmr-001.md)
-
 ### Done
+
+- [CMR-001 — Review files that are not markdown with a sidecar file](cmr-001.md)
 
 ---
 
