@@ -45,6 +45,59 @@ suite('Sidecar review', () => {
         assert.deepStrictEqual([api.cards()[0].from, api.cards()[0].to], [0, 13]);
     });
 
+    test('submitting a comment on an unsaved file saves it and writes the entry', async () => {
+        const { api, editor, file, sidecar } = await open(SOURCE);
+        await editor.edit(b => b.insert(new vscode.Position(1, 0), '// new\n'));
+        editor.selection = new vscode.Selection(0, 0, 0, 6);
+        await vscode.commands.executeCommand('criticmarkReview.addComment');
+        assert.strictEqual(await api.handle({ type: 'submitDraft', body: 'Why?' }), true);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('// new'));
+        assert.match(fs.readFileSync(sidecar, 'utf8'), /^\{line="1"==static==\}\{author="[^"]*" date="[^"]*">>Why\?<<\}\n$/);
+    });
+
+    test('a reply goes to the sidecar and leaves the source alone', async () => {
+        const { api, file, sidecar } = await open(SOURCE, REVIEW);
+        await until(() => api.cards().length === 1);
+        assert.strictEqual(await api.handle({ type: 'reply', id: api.cards()[0].id, body: 'Answer' }), true);
+        assert.strictEqual(fs.readFileSync(file, 'utf8'), SOURCE);
+        assert.match(fs.readFileSync(sidecar, 'utf8'), /Why static\?<<\}\{author="[^"]*" date="[^"]*">>Answer<<\}\n$/);
+    });
+
+    test('accept changes the source and removes the last entry with its file', async () => {
+        const { api, file, sidecar } = await open(SOURCE, '{line="1"~~static int x;~>int x;~~}\n');
+        await until(() => api.cards().length === 1);
+        assert.strictEqual(await api.handle({ type: 'accept', id: api.cards()[0].id }), true);
+        assert.ok(fs.readFileSync(file, 'utf8').startsWith('int x;\n'));
+        assert.strictEqual(fs.existsSync(sidecar), false);
+    });
+
+    test('reject removes the entry and leaves the source alone', async () => {
+        const { api, file, sidecar } = await open(SOURCE, '{line="1"~~static int x;~>int x;~~}\n');
+        await until(() => api.cards().length === 1);
+        assert.strictEqual(await api.handle({ type: 'reject', id: api.cards()[0].id }), true);
+        assert.strictEqual(fs.readFileSync(file, 'utf8'), SOURCE);
+        assert.strictEqual(fs.existsSync(sidecar), false);
+    });
+
+    test('accept on repeated code with a stale line is refused', async () => {
+        const review = '{line="6"~~return 0;~>return 1;~~}\n';
+        const { api, file, sidecar } = await open(SOURCE, review);
+        await until(() => api.cards().length === 1);
+        assert.strictEqual(await api.handle({ type: 'accept', id: api.cards()[0].id }), false);
+        assert.strictEqual(fs.readFileSync(file, 'utf8'), SOURCE);
+        assert.strictEqual(fs.readFileSync(sidecar, 'utf8'), review);
+    });
+
+    test('an action on a card that changed on disk is refused', async () => {
+        const { api, sidecar } = await open(SOURCE, REVIEW);
+        await until(() => api.cards().length === 1);
+        const { id } = api.cards()[0];
+        const other = '{line="3"==int first==}{author="Agent" date="2026-11-08">>Replaced<<}\n';
+        fs.writeFileSync(sidecar, other);
+        assert.strictEqual(await api.handle({ type: 'resolve', id, resolved: true }), false);
+        assert.strictEqual(fs.readFileSync(sidecar, 'utf8'), other);
+    });
+
     test('an empty extension list limits the review to markdown', async () => {
         const config = vscode.workspace.getConfiguration('criticmarkReview');
         await config.update('sidecarExtensions', [], vscode.ConfigurationTarget.Global);

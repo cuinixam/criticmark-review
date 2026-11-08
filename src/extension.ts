@@ -5,7 +5,7 @@ import {
     TextEdit, addComment, checkSelection, commentOnNode, deleteComment, deleteThread, editComment, isCurrent, reply, resolveSuggestion, setResolved,
 } from './markup/edits';
 import { parse } from './markup/parse';
-import { cardAt, placeCards, sidecarEnabled } from './markup/sidecar';
+import { acceptEdit, addEntry, cardAt, placeCards, quoteAt, removeEntry, sidecarEnabled } from './markup/sidecar';
 import { Decorations } from './ui/Decorations';
 import { PanelMessage, ReviewPanel, VIEW_ID } from './ui/ReviewPanel';
 
@@ -196,14 +196,48 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
         return ok;
     };
 
+    // The agent reads this file directly and no editor has it open, so it goes straight to disk.
+    const writeSidecar = async (document: vscode.TextDocument, build: () => TextEdit): Promise<boolean> => {
+        const text = sidecarText(document);
+        let edit: TextEdit;
+        try {
+            edit = build();
+        } catch (e) {
+            vscode.window.showErrorMessage((e as Error).message);
+            return false;
+        }
+        if (!isCurrent(text, edit)) {
+            vscode.window.showWarningMessage(STALE);
+            return false;
+        }
+        const next = text.slice(0, edit.from) + edit.insert + text.slice(edit.to);
+        const empty = next.trim() === '';
+        try {
+            if (empty) {
+                await vscode.workspace.fs.delete(sidecarUri(document));
+            } else {
+                await vscode.workspace.fs.writeFile(sidecarUri(document), new TextEncoder().encode(next));
+            }
+        } catch (e) {
+            vscode.window.showErrorMessage(`Cannot write the review file: ${(e as Error).message}`);
+            return false;
+        }
+        sidecars.set(document.uri.toString(), empty ? '' : next);
+        return true;
+    };
+
+    const applyReview = (document: vscode.TextDocument, build: () => TextEdit) =>
+        usesSidecar(document) ? writeSidecar(document, build) : applyEdit(document, build);
+
     // Finds a card again in the file as it is now, since the panel may show an older version.
     // A reply may land on a thread that got new replies meanwhile; other actions need the card unchanged.
     const locate = (id: string, allowNewReplies: boolean) => {
         if (!current) {
             return undefined;
         }
-        const parsed = parse(current.getText());
-        const fresh = cards(parsed);
+        const sidecar = usesSidecar(current);
+        const parsed = sidecar ? parse(sidecarText(current), true) : parse(current.getText());
+        const fresh = sidecar ? placeCards(parsed, current.getText()) : cards(parsed);
         const card = fresh.find(c => c.id === id);
         const seen = shown.find(c => c.id === id);
         // With identical cards the occurrence number alone may point at another one, so the position must match too.
@@ -273,9 +307,21 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                 return false;
             }
             const document = current;
-            const build = () => addComment(
+            let build = () => addComment(
                 parse(document.getText()), target.from, target.to, message.body, author(), today(), target.selected);
-            const ok = await applyEdit(document, build);
+            if (usesSidecar(document)) {
+                // The agent looks for the quote on disk. A save can also reformat the text and drop the draft.
+                if (document.isDirty) {
+                    await document.save();
+                }
+                if (draft !== target || !await loadSidecar(document)) {
+                    render();
+                    return false;
+                }
+                const line = target.selected ? document.positionAt(target.from).line + 1 : null;
+                build = () => addEntry(sidecarText(document), target.selected, line, message.body, author(), today());
+            }
+            const ok = await applyReview(document, build);
             if (ok) {
                 draft = undefined;
             }
@@ -291,47 +337,58 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                 return false;
             }
         }
+        if (current && usesSidecar(current) && !await loadSidecar(current)) {
+            return false;
+        }
         const found = locate(message.id, message.type === 'reply');
         if (!found) {
             return false;
         }
         const { document, parsed, card } = found;
         const thread = card.thread === null ? undefined : parsed.threads[card.thread];
+        const sidecar = usesSidecar(document);
+        const removeCard = () => removeEntry(sidecarText(document), card.entry!);
+        // On a suggestion, deleting the discussion keeps the suggestion, as it does inline.
+        const removesEntry = sidecar && card.suggestion === null;
         let ok = false;
         switch (message.type) {
             case 'reply':
-                ok = await applyEdit(document, () => thread
+                ok = await applyReview(document, () => thread
                     ? reply(parsed, thread, message.body, author(), today())
                     : commentOnNode(parsed, card.suggestion!, message.body, author(), today()));
                 break;
             case 'edit': {
                 const comment = card.comments[message.position];
                 if (comment) {
-                    ok = await applyEdit(document, () => editComment(parsed, comment.nodeIndex, message.body));
+                    ok = await applyReview(document, () => editComment(parsed, comment.nodeIndex, message.body));
                 }
                 break;
             }
             case 'deleteComment': {
                 const comment = card.comments[message.position];
                 if (thread && comment) {
-                    ok = await applyEdit(document, () => deleteComment(parsed, thread, comment.nodeIndex));
+                    ok = await applyReview(document, () => removesEntry && card.comments.length === 1 ? removeCard() : deleteComment(parsed, thread, comment.nodeIndex));
                 }
                 break;
             }
             case 'delete':
                 if (thread) {
-                    ok = await applyEdit(document, () => deleteThread(parsed, thread));
+                    ok = await applyReview(document, () => removesEntry ? removeCard() : deleteThread(parsed, thread));
                 }
                 break;
             case 'accept':
             case 'reject':
                 if (card.suggestion !== null) {
-                    ok = await applyEdit(document, () => resolveSuggestion(parsed, card.suggestion!, message.type === 'accept'));
+                    if (!sidecar) {
+                        ok = await applyEdit(document, () => resolveSuggestion(parsed, card.suggestion!, message.type === 'accept'));
+                    } else if (message.type === 'reject' || await applyEdit(document, () => acceptEdit(parsed, card, document.getText()))) {
+                        ok = await writeSidecar(document, removeCard);
+                    }
                 }
                 break;
             case 'resolve':
                 if (thread) {
-                    ok = await applyEdit(document, () => setResolved(parsed, thread, message.resolved));
+                    ok = await applyReview(document, () => setResolved(parsed, thread, message.resolved));
                 }
                 break;
         }
@@ -441,13 +498,15 @@ export function activate(context: vscode.ExtensionContext): { handle: (message: 
                 await panel.focus(inside.id);
                 return;
             }
-            const error = checkSelection(parse(document.getText()), from, to);
+            const sidecar = usesSidecar(document);
+            const error = sidecar ? null : checkSelection(parse(document.getText()), from, to);
             if (error) {
                 vscode.window.showErrorMessage(error);
                 return;
             }
+            const target = sidecar ? quoteAt(document.getText(), from, to) : { from, to, quote: document.getText(editor.selection) };
             current = document;
-            draft = { uri: document.uri.toString(), from, to, selected: document.getText(editor.selection) };
+            draft = { uri: document.uri.toString(), from: target.from, to: target.to, selected: target.quote };
             render();
             await panel.focus(null);
         }),
