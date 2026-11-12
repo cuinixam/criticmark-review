@@ -245,19 +245,19 @@
     "keybindings": [
       {
         "command": "criticmarkReview.addComment",
-        "key": "ctrl+alt+m",
+        "key": "ctrl+shift+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus && criticmarkReview.active && !criticmarkReview.at"
       },
       {
         "command": "criticmarkReview.openReply",
-        "key": "ctrl+alt+m",
+        "key": "ctrl+shift+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus && criticmarkReview.active && criticmarkReview.at == thread"
       },
       {
         "command": "criticmarkReview.commentSuggestion",
-        "key": "ctrl+alt+m",
+        "key": "ctrl+shift+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus && criticmarkReview.active && criticmarkReview.at == suggestion"
       }
