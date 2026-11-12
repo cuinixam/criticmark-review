@@ -1,3 +1,10 @@
+## [0.4.1](https://github.com/cuinixam/criticmark-review/compare/v0.4.0...v0.4.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* use a comment shortcut that does not type µ on german keyboards ([b6c2c26](https://github.com/cuinixam/criticmark-review/commit/b6c2c26292fb6e9f4e5fb347ecfdf5b85c03bdad))
+
 # [0.4.0](https://github.com/cuinixam/criticmark-review/compare/v0.3.0...v0.4.0) (2026-11-08)
 
 
