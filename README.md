@@ -38,7 +38,13 @@ Sidecar files are normal files in your repository. Do not add them to `.gitignor
 
 ## Install
 
-The extension is not on the Marketplace. Download the `.vsix` file from the latest [GitHub release](https://github.com/cuinixam/criticmark-review/releases) and install it:
+Install CriticMark Review from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=cuinixam.criticmark-review), or from the command line:
+
+```bash
+code --install-extension cuinixam.criticmark-review
+```
+
+Each [GitHub release](https://github.com/cuinixam/criticmark-review/releases) also has the `.vsix` file. To install it:
 
 ```bash
 code --install-extension criticmark-review-<version>.vsix
@@ -56,7 +62,7 @@ The steps are the same on macOS, Ubuntu and Windows.
 
 ## Releases
 
-Every push to `main` runs the tests and then [semantic-release](https://semantic-release.gitbook.io/). It picks the next version from the commit messages (`fix:` and `feat:`), updates `CHANGELOG.md` and `package.json`, and attaches the `.vsix` to a GitHub release. Never change the version by hand.
+Every push to `main` runs the tests and then [semantic-release](https://semantic-release.gitbook.io/). It picks the next version from the commit messages (`fix:` and `feat:`), updates `CHANGELOG.md` and `package.json`, attaches the `.vsix` to a GitHub release, and publishes it to the Marketplace. Never change the version by hand.
 
 ## Settings
 
