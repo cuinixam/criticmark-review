@@ -8,7 +8,7 @@ Review CriticMarkup comments and suggestions in markdown files from a side panel
 
 - The **Review** panel in the right side bar lists every thread and suggestion of the active markdown file. If you do not see it, run **View: Open View…** and choose **Threads**.
 - Select text, right-click, **Add Comment**. A new card opens in the panel with the cursor in its text box. Press **Comment** or `Cmd+Enter` (`Ctrl+Enter` on Windows and Linux) to write it to the file, or **Cancel** or `Escape` to drop it.
-- Without the mouse: select text and press `Cmd+Alt+M` (`Ctrl+Alt+M` on Windows and Linux). Inside a comment or a suggestion, the same key opens its reply box. After you comment, reply or cancel, the cursor goes back to the file.
+- Without the mouse: select text and press `Cmd+Alt+M` (`Ctrl+Shift+M` on Windows and Linux, where it replaces Show Problems while the editor has focus). Inside a comment or a suggestion, the same key opens its reply box. After you comment, reply or cancel, the cursor goes back to the file.
 
   ![The editor's right-click menu with Add Comment](docs/images/add-comment.png)
 - Click a card's header to expand or collapse it and to bring its text to the top of the editor. The selected card has a coloured border, and a small mark appears beside its first line. Expanded, a card shows every comment and a reply box. The **…** menu on a comment has **Edit** and **Delete comment**; deleting the last comment deletes the thread. The **…** menu on a card's header has **Delete thread**.
