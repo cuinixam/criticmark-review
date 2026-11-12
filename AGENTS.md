@@ -14,7 +14,7 @@ This file provides guidance to coding agents working in this repository.
 ## Rules
 
 - The file format must round trip with the Obsidian Track Changes plugin. [docs/format.md](docs/format.md) is the reference; [src/markup/parse.ts](src/markup/parse.ts) mirrors the plugin's parser. Change both together.
-- The extension is not on the Marketplace. Distribution is the `.vsix` file only.
+- The release workflow publishes each release to the Marketplace with trusted publishing (`vsce publish --oidc`), so there is no token secret. The `.vsix` is also attached to the GitHub release.
 
 ## Architecture
 

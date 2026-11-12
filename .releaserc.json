@@ -10,7 +10,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "npx vsce package ${nextRelease.version} --no-git-tag-version --out criticmark-review-${nextRelease.version}.vsix"
+        "prepareCmd": "npx vsce package ${nextRelease.version} --no-git-tag-version --out criticmark-review-${nextRelease.version}.vsix",
+        "publishCmd": "npx vsce publish --oidc --packagePath criticmark-review-${nextRelease.version}.vsix"
       }
     ],
     [
