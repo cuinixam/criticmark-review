@@ -8,17 +8,11 @@
 
 ## Table of Contents
 
-### Open
-
-- [CMR-004 — Review a staged file from its diff view](cmr-004.md)
-- [CMR-003 — Show the review of a source file when its .review file is open](cmr-003.md)
-- [CMR-002 — Escape CriticMarkup markers in sidecar quotes](cmr-002.md)
-
 ### In Progress
 
-### Done
+### Blocked
 
-- [CMR-001 — Review files that are not markdown with a sidecar file](cmr-001.md)
+### Ready
 
 ---
 
